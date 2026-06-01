@@ -1,0 +1,1735 @@
+<!DOCTYPE html>
+<html lang="bs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eliminacija Zastoja — Una# Vodič</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Barlow:wght@300;400;500;600;700;900&family=Barlow+Condensed:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --black: #080A0C;
+    --carbon: #0F1215;
+    --steel: #161B22;
+    --gunmetal: #1E252D;
+    --wire: #2A333D;
+    --chrome: #8899AA;
+    --mist: #C4CDD6;
+    --white: #EEF2F5;
+    --amber: #F5A623;
+    --amber-dim: #C47A0A;
+    --amber-glow: rgba(245,166,35,0.12);
+    --danger: #E53E3E;
+    --safe: #38A169;
+    --blue: #4299E1;
+    --page-width: 860px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--black);
+    color: var(--mist);
+    font-family: 'Barlow', sans-serif;
+    font-size: 16px;
+    line-height: 1.7;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* NOISE OVERLAY */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.6;
+  }
+
+  /* SIDEBAR NAV */
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100vh;
+    width: 220px;
+    background: var(--carbon);
+    border-right: 1px solid var(--wire);
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+    padding: 32px 0;
+    transform: translateX(0);
+    transition: transform 0.3s ease;
+  }
+
+  .sidebar-logo {
+    padding: 0 24px 32px;
+    border-bottom: 1px solid var(--wire);
+  }
+
+  .sidebar-logo .brand {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    color: var(--amber);
+    letter-spacing: 3px;
+    line-height: 1;
+  }
+
+  .sidebar-logo .tagline {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--chrome);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  .nav-items {
+    flex: 1;
+    padding: 24px 0;
+    overflow-y: auto;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 24px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-left: 2px solid transparent;
+    text-decoration: none;
+    color: var(--chrome);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .nav-item:hover { color: var(--white); background: rgba(255,255,255,0.04); }
+  .nav-item.active { color: var(--amber); border-left-color: var(--amber); background: var(--amber-glow); }
+
+  .nav-item .num {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--amber);
+    min-width: 18px;
+  }
+
+  .sidebar-footer {
+    padding: 20px 24px;
+    border-top: 1px solid var(--wire);
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--wire);
+    letter-spacing: 1px;
+  }
+
+  /* MAIN CONTENT */
+  .main {
+    margin-left: 220px;
+    min-height: 100vh;
+  }
+
+  /* PAGES */
+  .page {
+    max-width: var(--page-width);
+    margin: 0 auto;
+    padding: 80px 60px;
+    min-height: 100vh;
+    position: relative;
+  }
+
+  /* ---- COVER PAGE ---- */
+  .cover-page {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 60px;
+    position: relative;
+    overflow: hidden;
+    max-width: none;
+    margin: 0;
+  }
+
+  .cover-bg {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 70% 30%, rgba(245,166,35,0.08) 0%, transparent 60%),
+      radial-gradient(ellipse at 20% 80%, rgba(66,153,225,0.06) 0%, transparent 50%),
+      linear-gradient(180deg, var(--carbon) 0%, var(--black) 100%);
+  }
+
+  .cover-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(42,51,61,0.4) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(42,51,61,0.4) 1px, transparent 1px);
+    background-size: 60px 60px;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+  }
+
+  /* Animated scan line */
+  .scan-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--amber), transparent);
+    animation: scan 8s linear infinite;
+    opacity: 0.3;
+  }
+
+  @keyframes scan {
+    0% { top: 0; opacity: 0; }
+    5% { opacity: 0.3; }
+    95% { opacity: 0.3; }
+    100% { top: 100%; opacity: 0; }
+  }
+
+  .cover-content {
+    position: relative;
+    z-index: 2;
+    max-width: 780px;
+  }
+
+  .cover-kicker {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--amber);
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .cover-kicker::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 1px;
+    background: var(--amber);
+  }
+
+  .cover-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(52px, 8vw, 96px);
+    line-height: 0.92;
+    color: var(--white);
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+
+  .cover-title .highlight {
+    color: var(--amber);
+    display: block;
+  }
+
+  .cover-subtitle {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--chrome);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-top: 16px;
+    margin-bottom: 48px;
+  }
+
+  .cover-meta {
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+  }
+
+  .cover-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .cover-meta-item .label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--chrome);
+    text-transform: uppercase;
+  }
+
+  .cover-meta-item .value {
+    font-family: 'Barlow', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--white);
+  }
+
+  /* Decorative corner brackets */
+  .corner-bracket {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+  }
+
+  .corner-bracket.tl { top: 32px; left: 32px; border-top: 1px solid var(--amber); border-left: 1px solid var(--amber); }
+  .corner-bracket.tr { top: 32px; right: 32px; border-top: 1px solid var(--amber); border-right: 1px solid var(--amber); }
+  .corner-bracket.bl { bottom: 32px; left: 32px; border-bottom: 1px solid var(--amber); border-left: 1px solid var(--amber); }
+  .corner-bracket.br { bottom: 32px; right: 32px; border-bottom: 1px solid var(--amber); border-right: 1px solid var(--amber); }
+
+  /* Status bar at bottom of cover */
+  .status-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 48px;
+    background: var(--steel);
+    border-top: 1px solid var(--wire);
+    display: flex;
+    align-items: center;
+    padding: 0 60px;
+    gap: 32px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--chrome);
+    letter-spacing: 1.5px;
+  }
+
+  .status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--safe);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  .status-dot.amber { background: var(--amber); }
+  .status-dot.danger { background: var(--danger); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* ---- SECTION HEADERS ---- */
+  .section-header {
+    margin-bottom: 60px;
+  }
+
+  .section-kicker {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--amber);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .section-kicker::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--wire), transparent);
+  }
+
+  .section-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(40px, 6vw, 68px);
+    line-height: 0.95;
+    color: var(--white);
+    letter-spacing: 2px;
+    margin-bottom: 24px;
+  }
+
+  .section-lead {
+    font-size: 18px;
+    font-weight: 300;
+    color: var(--chrome);
+    line-height: 1.7;
+    max-width: 580px;
+    border-left: 2px solid var(--amber);
+    padding-left: 20px;
+  }
+
+  /* ---- CHAPTER STEPS ---- */
+  .chapter {
+    margin-bottom: 100px;
+    padding-bottom: 100px;
+    border-bottom: 1px solid var(--wire);
+    scroll-margin-top: 40px;
+  }
+
+  .chapter:last-child { border-bottom: none; }
+
+  .chapter-number {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 120px;
+    color: var(--steel);
+    line-height: 1;
+    position: absolute;
+    right: 60px;
+    top: -20px;
+    letter-spacing: -4px;
+    user-select: none;
+    pointer-events: none;
+  }
+
+  .chapter-header {
+    position: relative;
+    margin-bottom: 48px;
+  }
+
+  .chapter-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--amber);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .chapter-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 38px;
+    font-weight: 900;
+    color: var(--white);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    line-height: 1.1;
+  }
+
+  /* Body text */
+  .body-text {
+    font-size: 16px;
+    line-height: 1.85;
+    color: var(--mist);
+    margin-bottom: 24px;
+    font-weight: 300;
+  }
+
+  .body-text strong {
+    color: var(--white);
+    font-weight: 600;
+  }
+
+  /* ---- DATA CALLOUT ---- */
+  .data-callout {
+    background: var(--steel);
+    border: 1px solid var(--wire);
+    border-left: 3px solid var(--amber);
+    padding: 24px 28px;
+    margin: 32px 0;
+    position: relative;
+  }
+
+  .data-callout::before {
+    content: '// UNA# DATA';
+    position: absolute;
+    top: -10px;
+    left: 16px;
+    background: var(--steel);
+    padding: 0 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--amber);
+    letter-spacing: 2px;
+  }
+
+  .data-callout .stat {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 52px;
+    color: var(--amber);
+    line-height: 1;
+    display: block;
+  }
+
+  .data-callout .stat-label {
+    font-size: 13px;
+    color: var(--chrome);
+    font-weight: 500;
+    letter-spacing: 0.5px;
+  }
+
+  /* ---- COMPARISON TABLE ---- */
+  .comparison-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 32px 0;
+    font-size: 14px;
+  }
+
+  .comparison-table thead th {
+    padding: 14px 20px;
+    text-align: left;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--wire);
+  }
+
+  .comparison-table thead th:first-child { color: var(--chrome); }
+  .comparison-table thead th:nth-child(2) { color: var(--danger); background: rgba(229,62,62,0.06); }
+  .comparison-table thead th:nth-child(3) { color: var(--amber); background: var(--amber-glow); }
+
+  .comparison-table tbody tr {
+    border-bottom: 1px solid rgba(42,51,61,0.6);
+    transition: background 0.15s;
+  }
+
+  .comparison-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+
+  .comparison-table tbody td {
+    padding: 14px 20px;
+    vertical-align: top;
+    line-height: 1.5;
+  }
+
+  .comparison-table tbody td:first-child {
+    color: var(--chrome);
+    font-weight: 500;
+    font-size: 13px;
+  }
+
+  .comparison-table tbody td:nth-child(2) {
+    color: #FC8181;
+    background: rgba(229,62,62,0.04);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+  }
+
+  .comparison-table tbody td:nth-child(3) {
+    color: #F6E05E;
+    background: rgba(245,166,35,0.04);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+  }
+
+  .check { color: var(--safe); }
+  .cross { color: var(--danger); }
+
+  /* ---- PROCESS FLOW ---- */
+  .process-flow {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1px;
+    background: var(--wire);
+    margin: 40px 0;
+    border: 1px solid var(--wire);
+  }
+
+  .process-step {
+    background: var(--carbon);
+    padding: 24px 20px;
+    position: relative;
+    text-align: center;
+    transition: background 0.2s;
+  }
+
+  .process-step:hover { background: var(--steel); }
+
+  .process-step .step-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--amber);
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+
+  .process-step .step-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--white);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .process-step .step-icon {
+    font-size: 28px;
+    margin-bottom: 10px;
+    display: block;
+  }
+
+  /* ---- QUESTION BOX ---- */
+  .question-box {
+    background: var(--gunmetal);
+    border: 1px solid var(--wire);
+    padding: 32px;
+    margin: 40px 0 0;
+    position: relative;
+  }
+
+  .question-box::before {
+    content: 'PITANJE ZA VLASNIKA';
+    position: absolute;
+    top: -10px;
+    left: 20px;
+    background: var(--amber);
+    color: var(--black);
+    padding: 2px 12px;
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    font-weight: 700;
+  }
+
+  .question-text {
+    font-family: 'Barlow', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--white);
+    line-height: 1.5;
+    font-style: italic;
+  }
+
+  .question-text::before {
+    content: '"';
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 48px;
+    color: var(--amber);
+    line-height: 0.5;
+    float: left;
+    margin-right: 8px;
+    margin-top: 12px;
+  }
+
+  /* ---- INLINE METRIC ---- */
+  .metrics-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 32px 0;
+  }
+
+  .metric-card {
+    background: var(--steel);
+    border: 1px solid var(--wire);
+    padding: 20px;
+    text-align: center;
+  }
+
+  .metric-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 42px;
+    color: var(--amber);
+    line-height: 1;
+    display: block;
+  }
+
+  .metric-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--chrome);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-top: 6px;
+    display: block;
+  }
+
+  /* ---- INFO STRIP ---- */
+  .info-strip {
+    background: linear-gradient(135deg, var(--steel), var(--gunmetal));
+    border: 1px solid var(--wire);
+    border-top: 2px solid var(--blue);
+    padding: 20px 24px;
+    margin: 24px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .info-strip .icon { font-size: 22px; flex-shrink: 0; margin-top: 2px; }
+
+  .info-strip .content { font-size: 14px; color: var(--chrome); line-height: 1.6; }
+  .info-strip .content strong { color: var(--white); }
+
+  /* ---- SENSOR DIAGRAM ---- */
+  .sensor-diagram {
+    background: var(--carbon);
+    border: 1px solid var(--wire);
+    padding: 40px;
+    margin: 32px 0;
+    text-align: center;
+    position: relative;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .diagram-title {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--chrome);
+    text-transform: uppercase;
+    margin-bottom: 32px;
+  }
+
+  .diagram-flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    flex-wrap: wrap;
+  }
+
+  .diagram-node {
+    background: var(--steel);
+    border: 1px solid var(--wire);
+    padding: 16px 20px;
+    min-width: 110px;
+    text-align: center;
+  }
+
+  .diagram-node.active {
+    border-color: var(--amber);
+    background: var(--amber-glow);
+  }
+
+  .diagram-node .node-label {
+    font-size: 10px;
+    color: var(--chrome);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  .diagram-node .node-value {
+    font-size: 18px;
+    color: var(--white);
+    font-weight: 500;
+  }
+
+  .diagram-node.active .node-value { color: var(--amber); }
+
+  .diagram-arrow {
+    padding: 0 10px;
+    color: var(--wire);
+    font-size: 18px;
+  }
+
+  /* ---- CTA PAGE ---- */
+  .cta-page {
+    background: var(--carbon);
+    position: relative;
+    overflow: hidden;
+    max-width: none;
+    margin: 0;
+    padding: 100px 60px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .cta-bg {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 50%, rgba(245,166,35,0.1) 0%, transparent 65%);
+  }
+
+  .cta-content {
+    position: relative;
+    z-index: 2;
+    max-width: 700px;
+  }
+
+  .cta-eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--amber);
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+
+  .cta-headline {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(44px, 7vw, 80px);
+    color: var(--white);
+    line-height: 0.95;
+    letter-spacing: 2px;
+    margin-bottom: 32px;
+  }
+
+  .cta-headline .highlight { color: var(--amber); }
+
+  .cta-body {
+    font-size: 17px;
+    color: var(--chrome);
+    line-height: 1.7;
+    margin-bottom: 40px;
+    max-width: 520px;
+    font-weight: 300;
+  }
+
+  .pilot-offer {
+    background: var(--steel);
+    border: 1px solid var(--amber);
+    padding: 28px 32px;
+    margin-bottom: 40px;
+    position: relative;
+  }
+
+  .pilot-offer::before {
+    content: 'PILOT PROGRAM — OGRANIČENA DOSTUPNOST';
+    position: absolute;
+    top: -10px;
+    left: 16px;
+    background: var(--amber);
+    color: var(--black);
+    padding: 2px 12px;
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    font-weight: 700;
+  }
+
+  .pilot-items {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .pilot-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 14px;
+    color: var(--mist);
+  }
+
+  .pilot-item::before {
+    content: '→';
+    color: var(--amber);
+    font-family: 'DM Mono', monospace;
+    flex-shrink: 0;
+  }
+
+  .cta-buttons {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--amber);
+    color: var(--black);
+    padding: 16px 32px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+  }
+
+  .btn-primary:hover {
+    background: #FFB830;
+    transform: translateY(-1px);
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: transparent;
+    color: var(--chrome);
+    padding: 16px 32px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-decoration: none;
+    cursor: pointer;
+    border: 1px solid var(--wire);
+    transition: all 0.2s;
+  }
+
+  .btn-secondary:hover { border-color: var(--chrome); color: var(--white); }
+
+  /* PROGRESS BAR */
+  .reading-progress {
+    position: fixed;
+    top: 0;
+    left: 220px;
+    right: 0;
+    height: 2px;
+    background: var(--wire);
+    z-index: 200;
+  }
+
+  .reading-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--amber), #FFB830);
+    width: 0%;
+    transition: width 0.1s;
+  }
+
+  /* DIVIDER */
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--wire), transparent);
+    margin: 48px 0;
+  }
+
+  /* LIST */
+  .styled-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 24px 0;
+  }
+
+  .styled-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 15px;
+    color: var(--mist);
+    line-height: 1.6;
+  }
+
+  .styled-list li::before {
+    content: '▸';
+    color: var(--amber);
+    flex-shrink: 0;
+    font-size: 12px;
+    margin-top: 4px;
+  }
+
+  /* LIVE MONITOR WIDGET */
+  .live-monitor {
+    background: var(--carbon);
+    border: 1px solid var(--wire);
+    padding: 32px;
+    margin: 32px 0;
+    position: relative;
+  }
+
+  .live-monitor::before {
+    content: '● LIVE MONITOR — UNA# SIMULACIJA';
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--safe);
+    letter-spacing: 2px;
+  }
+
+  .monitor-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+
+  .monitor-cell {
+    background: var(--steel);
+    border: 1px solid var(--wire);
+    padding: 16px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .monitor-cell.alert { border-color: var(--danger); }
+  .monitor-cell.warning { border-color: var(--amber); }
+
+  .monitor-cell-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--chrome);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 10px;
+  }
+
+  .monitor-cell-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 36px;
+    color: var(--white);
+    display: block;
+    line-height: 1;
+  }
+
+  .monitor-cell.alert .monitor-cell-value { color: var(--danger); }
+  .monitor-cell.warning .monitor-cell-value { color: var(--amber); }
+  .monitor-cell.ok .monitor-cell-value { color: var(--safe); }
+
+  .monitor-cell-unit {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--chrome);
+    display: block;
+    margin-top: 4px;
+  }
+
+  /* Blinking animation for alert */
+  .monitor-cell.alert::after {
+    content: 'ALERT';
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    font-family: 'DM Mono', monospace;
+    font-size: 8px;
+    color: var(--danger);
+    letter-spacing: 1px;
+    animation: blink 1s step-end infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--black); }
+  ::-webkit-scrollbar-thumb { background: var(--wire); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--chrome); }
+
+  /* STICKY CTA */
+  .sticky-cta {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    padding: 16px;
+    background: var(--carbon);
+    border-top: 1px solid var(--wire);
+    text-align: center;
+    z-index: 300;
+    display: none;
+  }
+  @media (max-width: 768px) { .sticky-cta { display: block; } }
+
+  /* MOBILE */
+  @media (max-width: 768px) {
+    .sidebar { transform: translateX(-100%); width: 100%; }
+    .sidebar.open { transform: translateX(0); }
+    .main { margin-left: 0; }
+    .page { padding: 40px 16px; }
+    .cover-page { padding: 48px 16px 80px; }
+    .chapter-number { display: none; }
+    .metrics-row { grid-template-columns: 1fr; }
+    .monitor-grid { grid-template-columns: repeat(2, 1fr); }
+    .reading-progress { left: 0; }
+    .cta-page { padding: 60px 16px; }
+    .hamburger { display: flex; }
+  }
+
+  .hamburger {
+    display: none;
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 200;
+    background: var(--carbon);
+    border: 1px solid var(--wire);
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-direction: column;
+    gap: 5px;
+    padding: 8px;
+  }
+
+  .hamburger span {
+    display: block;
+    width: 100%;
+    height: 1px;
+    background: var(--amber);
+  }
+
+  /* Page separator between sections */
+  .section-break {
+    height: 1px;
+    background: var(--wire);
+    margin: 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- READING PROGRESS -->
+<div class="reading-progress">
+  <div class="reading-progress-fill" id="progressFill"></div>
+</div>
+
+<!-- HAMBURGER -->
+<div class="hamburger" id="hamburger" onclick="toggleSidebar()">
+  <span></span><span></span><span></span>
+</div>
+
+<!-- SIDEBAR -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">UNA#</div>
+    <div class="tagline">Industrijska Autonomija</div>
+  </div>
+  <div class="nav-items">
+    <a class="nav-item active" href="#cover" onclick="setActive(this)">
+      <span class="num">00</span> Naslovna
+    </a>
+    <a class="nav-item" href="#intro" onclick="setActive(this)">
+      <span class="num">01</span> Uvod
+    </a>
+    <a class="nav-item" href="#korak1" onclick="setActive(this)">
+      <span class="num">02</span> Uska Grla
+    </a>
+    <a class="nav-item" href="#korak2" onclick="setActive(this)">
+      <span class="num">03</span> Senzori
+    </a>
+    <a class="nav-item" href="#korak3" onclick="setActive(this)">
+      <span class="num">04</span> Dashboard
+    </a>
+    <a class="nav-item" href="#korak4" onclick="setActive(this)">
+      <span class="num">05</span> Analiza
+    </a>
+    <a class="nav-item" href="#korak5" onclick="setActive(this)">
+      <span class="num">06</span> Preventiva
+    </a>
+    <a class="nav-item" href="#cta" onclick="setActive(this)">
+      <span class="num">07</span> Pilot Program
+    </a>
+  </div>
+  <div class="sidebar-footer">
+    © 2025 UNA# — V1.0.2
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- ============ COVER ============ -->
+  <section id="cover" class="cover-page">
+    <div class="cover-bg"></div>
+    <div class="cover-grid"></div>
+    <div class="scan-line"></div>
+
+    <div class="corner-bracket tl"></div>
+    <div class="corner-bracket tr"></div>
+    <div class="corner-bracket bl"></div>
+    <div class="corner-bracket br"></div>
+
+    <div class="cover-content">
+      <div class="cover-kicker">Industrijski Vodič · BiH 2025</div>
+      <h1 class="cover-title">
+        Eliminacija
+        <span class="highlight">Zastoja</span>
+      </h1>
+      <div class="cover-subtitle">Digitalizuj Proizvodnju u 5 Koraka<br>Bez Zaustavljanja Rada</div>
+
+      <div class="cover-meta">
+        <div class="cover-meta-item">
+          <span class="label">Sistem</span>
+          <span class="value">Una# Platform</span>
+        </div>
+        <div class="cover-meta-item">
+          <span class="label">Verzija</span>
+          <span class="value">2025 · Bosanski</span>
+        </div>
+        <div class="cover-meta-item">
+          <span class="label">Čitanje</span>
+          <span class="value">~18 minuta</span>
+        </div>
+        <div class="cover-meta-item">
+          <span class="label">Namjena</span>
+          <span class="value">Vlasnici Fabrika · CNC Operateri</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <div class="status-indicator">
+        <div class="status-dot"></div>
+        <span>SISTEM AKTIVAN</span>
+      </div>
+      <div class="status-indicator">
+        <div class="status-dot amber"></div>
+        <span>DETEKCIJA DEFEKATA: ONLINE</span>
+      </div>
+      <div class="status-indicator">
+        <div class="status-dot danger"></div>
+        <span>RUČNO PRAĆENJE: DETEKTOVANO</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-break"></div>
+
+  <!-- ============ UVOD ============ -->
+  <section id="intro" class="page">
+    <div class="section-header">
+      <div class="section-kicker">01 · Uvod</div>
+      <h2 class="section-title">Tvoja Fabrika<br>Radi Protiv Tebe</h2>
+      <p class="section-lead">Znaš taj osjećaj. Stojite pred mašinom i čekate. Radnika nema, alarm je nešto javljao, a ti ne znaš ni gdje ni zašto. Svaki taj minut košta.</p>
+    </div>
+
+    <p class="body-text">Vlasnici proizvodnih firmi u BiH suočavaju se s problemom koji nije specifičan za jednu industriju — on je sistemski. <strong>Nedostatak kvalifikovanih radnika, skupi materijal i nevidljivi zastoji</strong> jedu profitnu maržu sa sva tri kraja. Odlaziš kući i misliš da si upravljao fabrikom. U stvari, fabrika je upravljala tobom.</p>
+
+    <p class="body-text">Digitalizacija nije luksuz koji si rezervisan za BMW ili Volkswagen. To je alat koji se danas može instalirati na CNC mašinu staru 15 godina, u hali bez klimatizacije, u gradu koji ni na karti ne postoji za investitore iz Frankfurta. <strong>Una# je razvijen upravo za takve objekte.</strong></p>
+
+    <div class="metrics-row">
+      <div class="metric-card">
+        <span class="metric-value">43%</span>
+        <span class="metric-label">Prosječan zastoj koji se<br>može spriječiti</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-value">7×</span>
+        <span class="metric-label">Brža detekcija<br>defekata vs. ručna</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-value">190+</span>
+        <span class="metric-label">Firmi u BiH koje rade<br>bez ikakve digitalizacije</span>
+      </div>
+    </div>
+
+    <p class="body-text">Ovaj vodič nije teorija. Nije EU grant aplikacija. Nije PowerPoint za investitore. Ovo je 5 konkretnih koraka koje možeš početi implementirati — sa timom kojeg imaš, sa budžetom kojeg imaš, bez zaustavljanja tekuće proizvodnje.</p>
+
+    <div class="info-strip">
+      <div class="icon">⚙️</div>
+      <div class="content">
+        <strong>Napomena o Una# sistemu:</strong> Una# je edge AI platforma razvijena u BiH za BiH industriju. Radi lokalno (bez potrebe za stalnom internet vezom), kompatibilna je sa standardnim industrijskim senzorima i integrira se u postojeće PLC/SCADA infrastrukture.
+      </div>
+    </div>
+
+    <div class="question-box">
+      <p class="question-text">Koliko sati prošle sedmice je tvoja linija stajala zbog razloga koji si saznao tek nakon što se desio?</p>
+    </div>
+  </section>
+
+  <div style="background: var(--gunmetal); padding: 24px; border: 1px solid var(--amber); margin: 0 auto; max-width: var(--page-width); margin-left: 220px;">
+    <h3 style="color: var(--amber); font-family: 'Bebas Neue', sans-serif; letter-spacing: 2px; font-size: 22px; margin-bottom: 8px;">UŠTEDA U 30 SEKUNDI</h3>
+    <p style="font-size: 15px; color: var(--white); line-height: 1.6;">Una# smanjuje zastoje za preko 20% kroz automatsko praćenje i analizu. Ne trebaju vam novi strojevi — samo bolji podaci iz ovih koje već imate. <a href="#cta" style="color: var(--blue);">Kliknite ovdje za testiranje.</a></p>
+  </div>
+
+  <div class="section-break"></div>
+
+  <!-- ============ KORAK 1 ============ -->
+  <section id="korak1" class="page">
+    <div class="chapter" style="position:relative">
+      <div class="chapter-number">01</div>
+      <div class="chapter-header">
+        <div class="chapter-tag">Korak 01 · Identifikacija</div>
+        <h2 class="chapter-title">Pronađi Gdje<br>Ti Kaplje Novac</h2>
+      </div>
+
+      <p class="body-text">Prije nego što instalirate bilo kakav senzor ili software, morate znati <strong>gdje su vaša uska grla</strong>. Ovo nije filozofsko pitanje — to je inžinjerska dijagnoza. Uska grlo nije uvijek tamo gdje mislite da jeste.</p>
+
+      <p class="body-text">Klasičan primjer: vlasnik metaloprerađivačke firme tvrdi da mu je problem spora isporuka. Nakon mapiranja, ispostavi se da mašina radi 67% raspoloživog vremena — ostatak je čekanje na materijal, papirno dokumentovanje i ručna kontrola kvaliteta. <strong>Problem nije brzina mašine. Problem je sve oko nje.</strong></p>
+
+      <div class="info-strip">
+        <div class="icon">🔍</div>
+        <div class="content">
+          <strong>Una# Mapping Protokol:</strong> Sistemom se instalira privremeni monitoring na postojeće tačke (struja, vibracija, PLC outputi) i u roku od 72 sata generiše heatmapa zastoja. Bez modifikacije linije, bez zaustavljanja.
+        </div>
+      </div>
+
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Parametar</th>
+            <th>❌ Ručno Mapiranje</th>
+            <th>✓ Una# Detekcija</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Preciznost mjerenja</td>
+            <td>±15% (procjena čovjeka)</td>
+            <td>±0.3% (senzorsko)</td>
+          </tr>
+          <tr>
+            <td>Potrebno vrijeme</td>
+            <td>2-4 sedmice observacije</td>
+            <td>48-72 sata automatski</td>
+          </tr>
+          <tr>
+            <td>Pokrivenost smjena</td>
+            <td>Samo kad je radnik prisutan</td>
+            <td>24/7 kontinuirano</td>
+          </tr>
+          <tr>
+            <td>Skriveni zastoji (noć)</td>
+            <td>Nevidljivi</td>
+            <td>Zabilježeni i klasificirani</td>
+          </tr>
+          <tr>
+            <td>Trošak analize</td>
+            <td>Plaćeni radni sati</td>
+            <td>Uključeno u sistem</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p class="body-text">Rezultat ovog koraka je <strong>lista tri do pet prioritetnih tačaka</strong> u liniji koje zajedno generišu 80% vaših zastoja. Tek sa tim listom ima smisla krenuti dalje.</p>
+
+      <div class="question-box">
+        <p class="question-text">Možeš li sada, bez gledanja u papire, tačno reći koji stroj ti je bio neproduktivan više od 20% radnog vremena prošlog mjeseca?</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-break"></div>
+
+  <!-- ============ KORAK 2 ============ -->
+  <section id="korak2" class="page">
+    <div class="chapter" style="position:relative">
+      <div class="chapter-number">02</div>
+      <div class="chapter-header">
+        <div class="chapter-tag">Korak 02 · Senzorsko Praćenje</div>
+        <h2 class="chapter-title">Mašina Koja<br>Govori</h2>
+      </div>
+
+      <p class="body-text">Svaka CNC mašina, svaka presa, svaki konvejer — <strong>već generišu podatke</strong>. Problem je što te podatke niko ne čuje. Vibracija koja nagovještava kvar ležaja. Temperaturni skok koji prethodi zastoju za 4 sata. Anomalija strujnog opterećenja koja znači da je alat tup. Una# ne donosi novu mašinu — on daje glas onoj koju već imaš.</p>
+
+      <div class="sensor-diagram">
+        <div class="diagram-title">// SENZORSKI PROTOK PODATAKA — UNA# ARHITEKTURA</div>
+        <div class="diagram-flow">
+          <div class="diagram-node">
+            <span class="node-label">Mašina</span>
+            <span class="node-value">CNC / PLC</span>
+          </div>
+          <div class="diagram-arrow">→</div>
+          <div class="diagram-node active">
+            <span class="node-label">Senzori</span>
+            <span class="node-value">IoT Edge</span>
+          </div>
+          <div class="diagram-arrow">→</div>
+          <div class="diagram-node active">
+            <span class="node-label">AI Model</span>
+            <span class="node-value">Lokalno</span>
+          </div>
+          <div class="diagram-arrow">→</div>
+          <div class="diagram-node">
+            <span class="node-label">Alarm</span>
+            <span class="node-value">SMS / App</span>
+          </div>
+          <div class="diagram-arrow">→</div>
+          <div class="diagram-node">
+            <span class="node-label">Akcija</span>
+            <span class="node-value">Pneumatik</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="live-monitor">
+        <div class="monitor-grid">
+          <div class="monitor-cell ok">
+            <span class="monitor-cell-label">Temperatura</span>
+            <span class="monitor-cell-value">74°</span>
+            <span class="monitor-cell-unit">NORMALNO</span>
+          </div>
+          <div class="monitor-cell warning">
+            <span class="monitor-cell-label">Vibracija</span>
+            <span class="monitor-cell-value">8.3</span>
+            <span class="monitor-cell-unit">mm/s — ↑ PRATI</span>
+          </div>
+          <div class="monitor-cell alert">
+            <span class="monitor-cell-label">Opterećenje</span>
+            <span class="monitor-cell-value">94%</span>
+            <span class="monitor-cell-unit">PREOPTEREĆENO</span>
+          </div>
+          <div class="monitor-cell ok">
+            <span class="monitor-cell-label">OEE Indeks</span>
+            <span class="monitor-cell-value">87%</span>
+            <span class="monitor-cell-unit">CILJNO > 85%</span>
+          </div>
+        </div>
+      </div>
+
+      <p class="body-text">Una# computer vision modul radi na edge uređaju direktno na liniji. Kamera snima komade koji izlaze. AI model (treniran na industrijskim defektima) klasifikuje svaki komad u realnom vremenu. <strong>Loš komad se automatski odbacuje pneumatskim ejektorom</strong> — bez da ikad stigne do kupca.</p>
+
+      <ul class="styled-list">
+        <li>Temperaturni senzori za rano upozorenje o kvaru ležaja (do 6 sati ranije)</li>
+        <li>Vibracijska analiza za detekciju istrošenog alata bez zaustavljanja stroja</li>
+        <li>Computer vision za 100% vizuelnu kontrolu (zamjena za 1-2 QC radnika)</li>
+        <li>Strujni monitoring za praćenje energetske efikasnosti i anomalija</li>
+      </ul>
+
+      <div class="divider"></div>
+
+      <div class="chapter-header">
+        <div class="chapter-tag">Korak 02 · Proširenje — Prehrambena industrija</div>
+        <h3 class="chapter-title" style="font-size: 28px;">Higijena Bez<br>Kompromisa</h3>
+      </div>
+
+      <p class="body-text">U prehrambenoj industriji, svaki čovjek na liniji je potencijalni rizik. Automatizacijom kontrole kvaliteta putem Una# sistema, drastično smanjujete broj potrebnih radnika u zoni maksimalne čistoće. <strong>AI ne ide na pauzu, ne treba mu zaštitna oprema, ne pravi higijenske propuste</strong> i radi u potpunosti u skladu sa najstrožim sanitarnim standardima.</p>
+
+      <div class="info-strip">
+        <div class="icon">🧼</div>
+        <div class="content">
+          <strong>HACCP & ISO kompatibilnost:</strong> Una# computer vision loguje svaki pregledani komad sa timestampom — automatski generiše dokumentaciju za sanitarne inspekcije bez dodatnog ručnog rada.
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="chapter-header">
+        <div class="chapter-tag">Korak 02 · Proširenje — Ljudski faktor</div>
+        <h3 class="chapter-title" style="font-size: 28px;">Fabrika Koja<br>Nikad Ne Čeka</h3>
+      </div>
+
+      <p class="body-text">Najveća skrivena cijena proizvodnje je zavisnost od ljudskog faktora. Bolovanja, godišnji odmori, kašnjenja ili odlasci radnika u potrazi za boljom platom — sve to zaustavlja vašu liniju. <strong>Una# sistem eliminiše taj rizik.</strong> On radi 24/7, 365 dana u godini. Nema bolovanja. Nema neplaniranih izostanaka. Vaša proizvodnja postaje predvidiva i stabilna, bez obzira na fluktuacije na tržištu rada.</p>
+
+      <div class="metrics-row">
+        <div class="metric-card">
+          <span class="metric-value">24/7</span>
+          <span class="metric-label">Rad sistema bez<br>prekida ili pauza</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">0</span>
+          <span class="metric-label">Bolovanja,<br>izostanaka, kašnjenja</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">365</span>
+          <span class="metric-label">Dana godišnje<br>stabilne produkcije</span>
+        </div>
+      </div>
+
+      <div class="question-box">
+        <p class="question-text">Koliko loših komada prošlog kvartala je prošlo kroz tvoju kontrolu kvaliteta i stiglo do kupca — i znaš li stvarnu cijenu reklamacije?</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-break"></div>
+
+  <!-- ============ KORAK 3 ============ -->
+  <section id="korak3" class="page">
+    <div class="chapter" style="position:relative">
+      <div class="chapter-number">03</div>
+      <div class="chapter-header">
+        <div class="chapter-tag">Korak 03 · Digitalni Dashboard</div>
+        <h2 class="chapter-title">Sve Na<br>Jednom Ekranu</h2>
+      </div>
+
+      <p class="body-text">Informacija koja postoji samo u glavi radnika nije informacija — to je rizik. Kada tvoja linija ima 4 mašine i 3 smjene, imate najmanje 12 mjesta gdje se podaci gube, deformišu ili kasne. <strong>Una# dashboard agregira sve u jedan prikaz</strong> — Una# dashboard je dostupan putem web-preglednika na bilo kojem uređaju (telefon, tablet ili PC). Svi podaci o radu linije su vam na dohvat ruke u svakom trenutku, bez potrebe za instalacijom dodatnih aplikacija.</p>
+
+      <p class="body-text">Ovo nije još jedan software koji zahtijeva obuku od tjedan dana. Sučelje je projektovano za ljude koji upravljaju fabrikama, ne za IT odjele. Ako znaš čitati semafor, znaš čitati dashboard.</p>
+
+      <div class="process-flow">
+        <div class="process-step">
+          <span class="step-icon">🟢</span>
+          <div class="step-num">STATUS</div>
+          <div class="step-label">Sve OK</div>
+        </div>
+        <div class="process-step">
+          <span class="step-icon">📊</span>
+          <div class="step-num">OEE</div>
+          <div class="step-label">Učinkovitost</div>
+        </div>
+        <div class="process-step">
+          <span class="step-icon">⚡</span>
+          <div class="step-num">ENERGY</div>
+          <div class="step-label">Potrošnja</div>
+        </div>
+        <div class="process-step">
+          <span class="step-icon">🔧</span>
+          <div class="step-num">MAINT</div>
+          <div class="step-label">Servis</div>
+        </div>
+        <div class="process-step">
+          <span class="step-icon">📦</span>
+          <div class="step-num">OUTPUT</div>
+          <div class="step-label">Produkcija</div>
+        </div>
+      </div>
+
+      <div class="data-callout">
+        <span class="stat">2.3h</span>
+        <span class="stat-label">Prosječno dnevno uštedeno na izvještavanju — kada nema dashboarda, menadžeri troše taj čas skupljajući podatke ručno.</span>
+      </div>
+
+      <p class="body-text">Una# dashboard uključuje i <strong>historiju smjena</strong> — svaki radnik koji pokrene mašinu, svaki alarm koji se desio, svaki parametar koji je odstupao. Ne zato što ne vjeruješ radnicima, nego zato što <strong>bez podataka nema poboljšanja</strong>.</p>
+
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Informacija</th>
+            <th>❌ Bez Sistema</th>
+            <th>✓ Una# Dashboard</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Status linije sada</td>
+            <td>Moraš nazvati poslovođu</td>
+            <td>Vidiš sa telefona odmah</td>
+          </tr>
+          <tr>
+            <td>Produkcija danas</td>
+            <td>Papirni list, ako ga ima</td>
+            <td>Ažurirano svake minute</td>
+          </tr>
+          <tr>
+            <td>Koji radnik, koja smjena</td>
+            <td>Sjećanje i trust</td>
+            <td>Log sa timestampom</td>
+          </tr>
+          <tr>
+            <td>Potrošnja energije</td>
+            <td>Račun na kraju mjeseca</td>
+            <td>Graf po mašini, po smjeni</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="question-box">
+        <p class="question-text">Kada si zadnji put bio na odmoru i morao nazvati kući jer nisi znao kako linija radi bez tebe — i šta bi se promijenilo da si mogao pogledati u telefon?</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-break"></div>
+
+  <!-- ============ KORAK 4 ============ -->
+  <section id="korak4" class="page">
+    <div class="chapter" style="position:relative">
+      <div class="chapter-number">04</div>
+      <div class="chapter-header">
+        <div class="chapter-tag">Korak 04 · Analiza u Realnom Vremenu</div>
+        <h2 class="chapter-title">Odluke Na<br>Osnovu Podataka</h2>
+      </div>
+
+      <p class="body-text">Razlika između fabrike koja stagnira i fabrike koja raste u pravilu nije kapital ni tržište — to je <strong>brzina odlučivanja</strong>. Menadžer koji čeka sedmični izvještaj da odluči hoće li povećati takt linije kasni 168 sati. Menadžer koji ima live podatke odlučuje u toku dana.</p>
+
+      <p class="body-text">Una# analitički modul ne samo da prikuplja podatke — on ih interpretira. Sistem automatski detektuje statističke anomalije, korelira parametre (npr. temperatura + vibracija + greška alata) i generiše preporuke. <strong>Ti dobijaš ne sirove brojeve, nego kontekst.</strong></p>
+
+      <div class="info-strip">
+        <div class="icon">📡</div>
+        <div class="content">
+          <strong>Edge AI, ne Cloud AI:</strong> Una# vrši analizu lokalno na industrijskom računaru u hali. Nema latencije zbog internet veze, nema zavisnosti od servera u Frankfurtu ili Dublinu. Kritična analiza dešava se u milisekundama.
+        </div>
+      </div>
+
+      <div class="metrics-row">
+        <div class="metric-card">
+          <span class="metric-value">340ms</span>
+          <span class="metric-label">Prosječno vrijeme<br>detekcije defekta</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">97.8%</span>
+          <span class="metric-label">Tačnost vizuelne<br>klasifikacije</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">0</span>
+          <span class="metric-label">Dependencija na<br>internet vezu</span>
+        </div>
+      </div>
+
+      <p class="body-text">Primjer iz prakse: Una# registruje da mašina broj 3 svaki petak u drugoj smjeni pokazuje veće stope odbačenih komada. Korelacija sa podacima o operateru i temperaturi hale otkriva pravi uzrok — <strong>ne loš radnik, nego termička ekspanzija alata u popodnevnim satima</strong>. Rješenje je korekcija offseta od 0.02mm. Bez data-drivene analize, ovaj problem bi se pripisivao "lošem radu" godinama.</p>
+
+      <div class="question-box">
+        <p class="question-text">Koliko puta si donio odluku o produkciji na osnovu osjećaja, a ne mjerenja — i znaš li koliko te je ta odluka koštala?</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-break"></div>
+
+  <!-- ============ KORAK 5 ============ -->
+  <section id="korak5" class="page">
+    <div class="chapter" style="position:relative">
+      <div class="chapter-number">05</div>
+      <div class="chapter-header">
+        <div class="chapter-tag">Korak 05 · Preventivno Održavanje</div>
+        <h2 class="chapter-title">Popravi Prije<br>Nego Što Pukne</h2>
+      </div>
+
+      <p class="body-text">Postoje tri pristupa održavanju mašina. <strong>Reaktivno</strong> — čekaš da se pokvari, pa popravljaš (ovo je najskuplji pristup). <strong>Planirano</strong> — servisirate po kalendaru bez obzira na stvarno stanje (ovo je bolji pristup, ali i dalje neefikasan). <strong>Prediktivno</strong> — sistem ti javlja kada je servis stvarno potreban, na osnovu mjerenog stanja mašine.</p>
+
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Tip Održavanja</th>
+            <th>❌ Reaktivno / Planirano</th>
+            <th>✓ Una# Prediktivno</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Kada servis?</td>
+            <td>Kad se pokvari / Po kalendaru</td>
+            <td>Kad podaci kažu — ni ranije ni kasnije</td>
+          </tr>
+          <tr>
+            <td>Neplaniran zastoj</td>
+            <td>Čest, skup, dugotrajan</td>
+            <td>Rijedak, predvidiv, kratak</td>
+          </tr>
+          <tr>
+            <td>Trošak rezervnih dijelova</td>
+            <td>Visok (hitna nabavka)</td>
+            <td>Nizak (planirana nabavka)</td>
+          </tr>
+          <tr>
+            <td>Životni vijek mašine</td>
+            <td>Kraćen preopterećenjem</td>
+            <td>Produžen optimalnim radom</td>
+          </tr>
+          <tr>
+            <td>Stres u timu</td>
+            <td>Visok ("opet stala!")</td>
+            <td>Nizak (predvidivo radi)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="data-callout">
+        <span class="stat">67%</span>
+        <span class="stat-label">Zastoja u prosječnoj BiH fabrici koji su predvidivi i spriječivi uz senzorsko praćenje — ali se javljaju zato što nema sistema koji bi ih najavio na vrijeme.</span>
+      </div>
+
+      <p class="body-text">Una# prati specifične signale koji prethode kvaru: trend vibracija ležaja, pad tlaka hidraulike, promjena u zvučnom spektru motora. Kada kombinacija parametara dostigne kritičan prag, <strong>sistem šalje alarm 24-72 sata unaprijed</strong> — dovoljno vremena da naručiš dio, zaplaniraš servisni prozor i ne zaustavljaš produkciju iznenadni.</p>
+
+      <ul class="styled-list">
+        <li><strong>Ležaji:</strong> Detekcija istrošenosti 48-72h unaprijed kroz analizu vibracijskog spektra</li>
+        <li><strong>Alati:</strong> Real-time praćenje habanja kroz strujno opterećenje i vizuelnu inspekciju</li>
+        <li><strong>Hidraulika:</strong> Praćenje tlaka i temperature za rano upozorenje o curenju ili začepljenju</li>
+        <li><strong>Elektromotori:</strong> Analiza struje za detekciju pregrijavanja i ispravljanje problema u startu</li>
+      </ul>
+
+      <div class="question-box">
+        <p class="question-text">Koji je bio tvoj najveći neplaniran zastoj prošle godine — i da si za njega znao 48 sati ranije, šta bi drugačije uradio?</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-break"></div>
+
+  <!-- ============ CTA ============ -->
+  <section id="cta" class="cta-page">
+    <div class="cta-bg"></div>
+    <div class="corner-bracket tl"></div>
+    <div class="corner-bracket tr"></div>
+    <div class="corner-bracket bl"></div>
+    <div class="corner-bracket br"></div>
+
+    <div class="cta-content">
+      <div class="cta-eyebrow">07 · Sljedeći Korak</div>
+      <h2 class="cta-headline">
+        Tvoja Fabrika<br>
+        <span class="highlight">Može Bolje.</span><br>
+        Dokaži To.
+      </h2>
+
+      <p class="cta-body">Una# pilot program je 30-dnevno testiranje sistema na tvojoj liniji — bez zaustavljanja produkcije, bez IT tima, bez unaprijed plaćene licence. Plaćaš samo ako vidiš rezultate.</p>
+
+      <div class="pilot-offer">
+        <ul class="pilot-items">
+          <li>Besplatna dijagnoza i mapiranje zastoja (72 sata, bez modifikacije linije)</li>
+          <li>Instalacija senzorskog seta i edge AI modula na jednu mašinu po tvom izboru</li>
+          <li>Pristup live podacima putem sigurnog web dashboarda (optimizovano za sve ekrane)</li>
+          <li>Izvještaj sa konkretnim brojevima: koliko si izgubio, koliko si uštedio</li>
+          <li>Bez automatskog produženja — ti odlučuješ šta dalje</li>
+        </ul>
+        <p style="margin-top: 16px; font-size: 13px; color: var(--chrome); font-style: italic; border-top: 1px solid var(--wire); padding-top: 16px;">„Pilot podrška uključuje 24/7 pristup inženjeru i garantovan odziv unutar 4 sata za kritične zastoje."</p>
+      </div>
+
+      <div class="cta-buttons">
+        <a class="btn-primary" href="mailto:info@una-sharp.ba">
+          Zatraži Pilot Program →
+        </a>
+        <a class="btn-secondary" href="tel:+38761000000">
+          Razgovor s Inženjerom
+        </a>
+      </div>
+
+      <div style="margin-top: 40px; padding-top: 32px; border-top: 1px solid var(--wire);">
+        <div style="font-family: 'DM Mono', monospace; font-size: 10px; color: var(--chrome); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 16px;">Una# · Industrijska Autonomija · Bosna i Hercegovina</div>
+        <div style="font-size: 13px; color: var(--wire);">Razvijeno u BiH za BiH industriju. Edge AI. Computer Vision. Bez cloud zavisnosti.</div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  // Reading progress
+  window.addEventListener('scroll', () => {
+    const doc = document.documentElement;
+    const scrollTop = doc.scrollTop || document.body.scrollTop;
+    const scrollHeight = doc.scrollHeight - doc.clientHeight;
+    const progress = (scrollTop / scrollHeight) * 100;
+    document.getElementById('progressFill').style.width = progress + '%';
+
+    // Active nav highlighting
+    const sections = ['cover','intro','korak1','korak2','korak3','korak4','korak5','cta'];
+    let current = 'cover';
+    for (const id of sections) {
+      const el = document.getElementById(id);
+      if (el && el.getBoundingClientRect().top <= 100) current = id;
+    }
+    document.querySelectorAll('.nav-item').forEach(item => {
+      item.classList.toggle('active', item.getAttribute('href') === '#' + current);
+    });
+  });
+
+  function setActive(el) {
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    el.classList.add('active');
+    if (window.innerWidth <= 768) toggleSidebar();
+  }
+
+  function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+  }
+
+  // Animate numbers on entry
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.style.opacity = '1';
+        entry.target.style.transform = 'translateY(0)';
+      }
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.chapter, .section-header, .data-callout, .pilot-offer').forEach(el => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(20px)';
+    el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+    observer.observe(el);
+  });
+</script>
+
+<div class="sticky-cta">
+  <a class="btn-primary" style="width: 100%; justify-content: center;" href="mailto:info@una-sharp.ba">Zatraži Pilot Program →</a>
+</div>
+
+</body>
+</html>
