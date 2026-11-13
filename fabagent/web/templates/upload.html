@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Upload fajla{% endblock %}
+{% block title %}Upload fajla
+{% endblock %}
 {% block content %}
 <nav aria-label="breadcrumb"><ol class="breadcrumb small mb-2">
   <li class="breadcrumb-item"><a href="/">Šabloni</a></li>
@@ -30,6 +31,20 @@
       <fieldset class="border rounded p-3 mb-3 fmt-fields" data-formats="png,jpg,jpeg" id="background-fields">
         <legend class="float-none w-auto px-2 small fw-semibold mb-0">Uklanjanje pozadine</legend>
         <p class="small text-muted mb-2">Pokreće se samo ako zadaš okvir. Vrijednosti su dijelovi slike: 0 = lijeva/gornja ivica, 1 = desna/donja. Primjenjuje se prije svega ostalog.</p>
+        <div id="okvir-platno" hidden class="mb-3">
+          <div class="btn-group btn-group-sm mb-2" role="group">
+            {% for v, lbl in [('okvir', 'Okvir oko motiva'), ('motiv', 'Sigurni motiv'), ('izbaci', 'Izbaci')] %}
+            <input type="radio" class="btn-check" name="okvir-izbor" id="izbor-{{ v }}" value="{{ v }}" {% if loop.first %}checked{% endif %}>
+            <label class="btn btn-outline-secondary" for="izbor-{{ v }}">{{ lbl }}</label>
+            {% endfor %}
+            <button type="button" class="btn btn-outline-secondary" id="okvir-obrisi">Obriši okvire</button>
+          </div>
+          <div class="okvir-wrap">
+            <img id="okvir-slika" alt="Pregled slike">
+            <div id="okvir-sloj" class="okvir-sloj"></div>
+          </div>
+          <div class="form-text" id="okvir-poruka">Povuci mišem preko slike.</div>
+        </div>
         <div class="row g-2 mb-2">
           <div class="col-12"><span class="small fw-semibold">Okvir oko motiva</span></div>
           {% for f, lbl in [('okvir_lijevo', 'lijevo'), ('okvir_gore', 'gore'), ('okvir_desno', 'desno'), ('okvir_dolje', 'dolje')] %}
@@ -214,4 +229,5 @@
   update();
 })();
 </script>
+<script src="/static/okvir.js?v={{ asset_v }}"></script>
 {% endblock %}
