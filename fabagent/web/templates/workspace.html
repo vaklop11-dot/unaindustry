@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}Radni ekran{% endblock %}
+{% block sidebar %}{% endblock %}
+{% block main_class %}col-12 p-0{% endblock %}
+{% block content %}
+<div class="ws-app" id="ws-app">
+  <div class="ws-bar ws-menubar">
+    <button type="button" id="ws-new" title="Novi crtež">Novi</button>
+    <button type="button" id="ws-open" title="Otvori projekat (.fabagent) ili LightBurn projekat (.lbrn, .lbrn2)">Otvori</button>
+    <button type="button" id="ws-save" title="Sačuvaj projekat (.fabagent)">Sačuvaj</button>
+    <button type="button" id="ws-import" title="Uvezi LightBurn projekat (LBRN, LBRN2), SVG, DXF, PDF ili sliku (PNG, JPG, BMP, GIF, WEBP). Fajl možeš i prevući na platno.">Uvezi</button>
+    <span class="ws-sep"></span>
+    <button type="button" id="ws-undo" title="Poništi (Ctrl+Z)">Poništi</button>
+    <button type="button" id="ws-redo" title="Vrati (Ctrl+Y)">Vrati</button>
+    <span class="ws-sep"></span>
+    <button type="button" id="ws-cut" title="Izreži (Ctrl+X)">Izreži</button>
+    <button type="button" id="ws-copy" title="Kopiraj (Ctrl+C)">Kopiraj</button>
+    <button type="button" id="ws-paste" title="Zalijepi (Ctrl+V)">Zalijepi</button>
+    <button type="button" id="ws-dup" title="Dupliraj (Ctrl+D)">Dupliraj</button>
+    <button type="button" id="ws-del" title="Obriši (Delete)">Obriši</button>
+    <button type="button" id="ws-all" title="Selektuj sve (Ctrl+A)">Selektuj sve</button>
+    <span class="ws-sep"></span>
+    <button type="button" id="ws-group" title="Grupiši (Ctrl+G)">Grupiši</button>
+    <button type="button" id="ws-ungroup" title="Razgrupiši (Ctrl+U)">Razgrupiši</button>
+    <span class="ws-sep"></span>
+    <button type="button" id="ws-zoom-in" title="Uvećaj (točkić miša)">Zoom +</button>
+    <button type="button" id="ws-zoom-out" title="Umanji (točkić miša)">Zoom −</button>
+    <button type="button" id="ws-zoom-fit" title="Prikaži cijelu radnu površinu">Cijela površina</button>
+    <button type="button" id="ws-zoom-sel" title="Prikaži selekciju">Na selekciju</button>
+    <span class="ws-sep"></span>
+    <button type="button" id="ws-trace" title="Trasiraj sliku: selektovana slika se pretvara u konture">Trasiraj sliku</button>
+  </div>
+
+  <div class="ws-bar ws-numbar">
+    <label>X poz <input type="number" step="0.1" id="ws-x"> mm</label>
+    <label>Y poz <input type="number" step="0.1" id="ws-y"> mm</label>
+    <label>Širina <input type="number" step="0.1" min="0" id="ws-w"> mm</label>
+    <label>Visina <input type="number" step="0.1" min="0" id="ws-h"> mm</label>
+    <label title="Zadrži odnos širine i visine"><input type="checkbox" id="ws-lock" checked> zaključaj odnos</label>
+    <label>Rotacija <input type="number" step="1" id="ws-r"> °</label>
+    <span class="ws-sep"></span>
+    <label title="Broj stranica za alat Poligon">Stranica <input type="number" min="3" max="60" step="1" id="ws-sides" value="6"></label>
+    <span class="ws-hint" id="ws-hint"></span>
+  </div>
+
+  <div class="ws-tools" id="ws-tools" role="toolbar" aria-label="Alati" aria-orientation="vertical">
+    <button type="button" class="ws-tool active" data-tool="select" title="Selektuj (Esc)" aria-label="Selektuj">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3l12 9-5.5 1 3 6.5-2.2 1-3-6.5L6 18z" fill="currentColor"/></svg></button>
+    <button type="button" class="ws-tool" data-tool="pan" title="Pomjeri prikaz (ili srednji taster miša / razmaknica + prevlačenje)" aria-label="Pomjeri prikaz">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3 3h-2v6h6V9l3 3-3 3v-2h-6v6h2l-3 3-3-3h2v-6H5v2l-3-3 3-3v2h6V5H9z" fill="currentColor"/></svg></button>
+    <button type="button" class="ws-tool" data-tool="nodes" title="Uredi čvorove (dvoklik na liniju dodaje čvor, Delete briše izabrani)" aria-label="Uredi čvorove">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18C7 8 14 6 19 6" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="2.5" y="15.5" width="5" height="5" fill="currentColor"/><rect x="16.5" y="3.5" width="5" height="5" fill="currentColor"/></svg></button>
+    <button type="button" class="ws-tool" data-tool="line" title="Linije (klik = tačka, dvoklik ili Enter = kraj, klik na prvu tačku = zatvori)" aria-label="Linije">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19l6-12 5 8 7-10" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
+    <button type="button" class="ws-tool" data-tool="rect" title="Pravougaonik (Shift = kvadrat)" aria-label="Pravougaonik">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="6.5" width="17" height="11" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
+    <button type="button" class="ws-tool" data-tool="ellipse" title="Elipsa (Shift = krug)" aria-label="Elipsa">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="12" rx="8.5" ry="6" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
+    <button type="button" class="ws-tool" data-tool="polygon" title="Poligon (broj stranica je u gornjoj traci, Shift = pravilan)" aria-label="Poligon">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.6v8.8L12 21l-8-4.6V7.6z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
+    <button type="button" class="ws-tool" data-tool="text" title="Tekst (klik na platno; dvoklik na postojeći tekst ga mijenja)" aria-label="Tekst">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v3h-1.5V6.8h-4.6v10.9H15V19H9v-1.3h2.1V6.8H6.5V8H5z" fill="currentColor"/></svg></button>
+    <span class="ws-tsep"></span>
+    <button type="button" class="ws-tool" id="ws-union" title="Spoji oblike (2 ili više zatvorenih oblika)" aria-label="Spoji">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h12v6h6v12H9v-6H3z" fill="currentColor" fill-opacity=".45" stroke="currentColor" stroke-width="1.4"/></svg></button>
+    <button type="button" class="ws-tool" id="ws-subtract" title="Oduzmi: od prvog izabranog oblika oduzima drugi" aria-label="Oduzmi">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h12v6H9v6H3z" fill="currentColor" fill-opacity=".45" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="9" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 2"/></svg></button>
+    <button type="button" class="ws-tool" id="ws-intersect" title="Presjek: ostaje samo zajednički dio 2 oblika" aria-label="Presjek">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 2"/><rect x="9" y="9" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 2"/><rect x="9" y="9" width="6" height="6" fill="currentColor" fill-opacity=".6" stroke="currentColor" stroke-width="1.4"/></svg></button>
+    <button type="button" class="ws-tool" id="ws-offset" title="Offset: nova kontura na zadatoj udaljenosti (van ili unutra)" aria-label="Offset">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7.5" y="7.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 2"/></svg></button>
+  </div>
+
+  <div class="ws-stage" id="ws-stage"><canvas id="ws-canvas"></canvas></div>
+
+  <div class="ws-side">
+    <section class="ws-panel">
+      <h2>Cuts / Layers</h2>
+      <table class="ws-layers" id="ws-layers">
+        <thead><tr><th>#</th><th>Režim</th><th title="mm/min">Brzina</th><th title="%">Snaga</th><th title="Broj prolaza">Prolaza</th>
+          <th title="Razmak linija kod popune i slika (mm)">Interval</th><th title="Šalje se na laser">Izlaz</th><th title="Vidljivo na platnu">Prikaži</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p class="ws-empty" id="ws-layers-empty">Nema oblika. Nacrtaj ili uvezi nešto – sloj se pojavi ovdje.</p>
+    </section>
+
+    <section class="ws-panel" id="ws-image-panel" hidden>
+      <h2>Slika</h2>
+      <div class="ws-row">
+        <label>Režim <select id="ws-img-mode"></select></label>
+        <label id="ws-img-alg-wrap">Dither <select id="ws-img-alg"></select></label>
+        <label id="ws-img-thr-wrap">Prag <input type="number" min="0" max="255" step="1" id="ws-img-thr"></label>
+        <label><input type="checkbox" id="ws-img-neg"> negativ</label>
+      </div>
+    </section>
+
+    <section class="ws-panel">
+      <h2>Laser <span class="ws-badge" id="ws-lstatus">Otkopčano</span></h2>
+      <p class="ws-warn" id="ws-serial-unsupported" hidden>Ovaj browser nema Web Serial. Koristi Google Chrome ili Microsoft Edge na adresi http://127.0.0.1.</p>
+      <div class="ws-row">
+        <button type="button" id="ws-connect">Poveži</button>
+        <button type="button" id="ws-disconnect" disabled>Prekini vezu</button>
+        <span class="ws-small">GRBL: <strong id="ws-grbl">—</strong> · <code id="ws-pos">—</code></span>
+      </div>
+      <div class="ws-row">
+        <button type="button" class="ws-conn" id="ws-pause" disabled>Pause</button>
+        <button type="button" class="ws-conn ws-stop" id="ws-stop" disabled>Stop</button>
+        <button type="button" class="ws-conn ws-start" id="ws-start" disabled>Start</button>
+      </div>
+      <div class="ws-row">
+        <button type="button" class="ws-conn" id="ws-frame" disabled title="Obilazi okvir posla sa ugašenim laserom">Frame</button>
+        <button type="button" id="ws-save-gcode">Sačuvaj G-code</button>
+        <button type="button" class="ws-conn" id="ws-home" disabled>Home</button>
+        <button type="button" class="ws-conn" id="ws-origin" disabled title="G0 X0 Y0">Na ishodište</button>
+        <button type="button" class="ws-conn" id="ws-unlock" disabled title="$X">Otključaj</button>
+      </div>
+      <div class="ws-row">
+        <label title="Na laser ide samo ono što je selektovano"><input type="checkbox" id="ws-sel-only"> samo selektovano</label>
+        <span class="ws-small">Počinje od: apsolutne koordinate</span>
+      </div>
+      <div class="ws-row ws-jog">
+        <span class="ws-small">Pomjeranje glave:</span>
+        <button type="button" class="ws-conn" data-jog="-1,0" disabled title="X−">◄</button>
+        <button type="button" class="ws-conn" data-jog="0,1" disabled title="Y+">▲</button>
+        <button type="button" class="ws-conn" data-jog="0,-1" disabled title="Y−">▼</button>
+        <button type="button" class="ws-conn" data-jog="1,0" disabled title="X+">►</button>
+        <label>korak <select id="ws-jog-step"><option>0.1</option><option>1</option><option selected>10</option><option>50</option></select> mm</label>
+      </div>
+      <div class="ws-progress"><div id="ws-progress"></div><span id="ws-progress-text">0 %</span></div>
+      <div class="ws-console" id="ws-console" aria-live="polite"></div>
+      <div class="ws-row">
+        <input type="text" id="ws-cmd" placeholder="ručna komanda, npr. $$ ili G0 X10 Y10" disabled>
+        <button type="button" class="ws-conn" id="ws-send" disabled>Pošalji</button>
+        <button type="button" id="ws-clear">Očisti</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="ws-palette" id="ws-palette" role="listbox" aria-label="Slojevi"></div>
+  <div class="ws-status"><span id="ws-msg" role="status"></span><span id="ws-coords"></span></div>
+</div>
+
+<input type="file" id="ws-file" hidden multiple accept=".lbrn,.lbrn2,.svg,.dxf,.pdf,.png,.jpg,.jpeg,.bmp,.gif,.webp">
+<input type="file" id="ws-file-project" hidden accept=".fabagent,.json,.lbrn,.lbrn2">
+
+<dialog class="ws-dialog" id="ws-dlg-text">
+  <form method="dialog">
+    <h3>Tekst</h3>
+    <label>Tekst <textarea id="ws-text-value" rows="3"></textarea></label>
+    <label>Font <select id="ws-text-font"></select></label>
+    <label>Visina velikog slova <input type="number" step="0.5" id="ws-text-height" value="10"> mm</label>
+    <p class="ws-err" id="ws-text-err"></p>
+    <div class="ws-row ws-right"><button type="button" id="ws-text-cancel">Odustani</button><button type="button" class="ws-primary" id="ws-text-ok">U redu</button></div>
+  </form>
+</dialog>
+
+<dialog class="ws-dialog" id="ws-dlg-offset">
+  <form method="dialog">
+    <h3>Offset</h3>
+    <label>Udaljenost <input type="number" step="0.1" min="0.01" id="ws-offset-dist" value="1"> mm</label>
+    <label><input type="radio" name="ws-offset-dir" value="1" checked> prema van</label>
+    <label><input type="radio" name="ws-offset-dir" value="-1"> prema unutra</label>
+    <label><input type="checkbox" id="ws-offset-del"> obriši originalni oblik</label>
+    <p class="ws-err" id="ws-offset-err"></p>
+    <div class="ws-row ws-right"><button type="button" id="ws-offset-cancel">Odustani</button><button type="button" class="ws-primary" id="ws-offset-ok">U redu</button></div>
+  </form>
+</dialog>
+
+<dialog class="ws-dialog" id="ws-dlg-trace">
+  <form method="dialog">
+    <h3>Trasiraj sliku</h3>
+    <label>Prag (0–255; tamnije od praga postaje oblik) <input type="number" min="0" max="255" step="1" id="ws-trace-thr"></label>
+    <label><input type="checkbox" id="ws-trace-del"> obriši sliku nakon trasiranja</label>
+    <p class="ws-err" id="ws-trace-err"></p>
+    <div class="ws-row ws-right"><button type="button" id="ws-trace-cancel">Odustani</button><button type="button" class="ws-primary" id="ws-trace-ok">U redu</button></div>
+  </form>
+</dialog>
+
+<dialog class="ws-dialog" id="ws-dlg-start">
+  <form method="dialog">
+    <h3>Pokrenuti laser?</h3>
+    <div id="ws-start-info"></div>
+    <label><input type="checkbox" id="ws-start-safe"> Materijal je postavljen i fokusiran, naočale su na očima, ostajem uz mašinu.</label>
+    <div class="ws-row ws-right"><button type="button" id="ws-start-cancel">Odustani</button><button type="button" class="ws-primary ws-start" id="ws-start-ok" disabled>Start – laser će se upaliti</button></div>
+  </form>
+</dialog>
+
+<script>window.FAB_WS = {{ ws_cfg|tojson }};</script>
+<script src="/static/fabric.min.js?v={{ asset_v }}"></script>
+<script src="/static/workspace.js?v={{ asset_v }}"></script>
+<script src="/static/workspace_laser.js?v={{ asset_v }}"></script>
+{% endblock %}

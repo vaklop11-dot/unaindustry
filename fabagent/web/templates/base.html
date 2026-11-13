@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="bs" data-bs-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}FabAgent{% endblock %} · FabAgent</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/bootstrap.min.css?v={{ asset_v }}">
+  <link rel="stylesheet" href="/static/app.css?v={{ asset_v }}">
+</head>
+<body>
+<nav class="navbar navbar-dark bg-dark px-3">
+  <a class="navbar-brand fw-semibold" href="/">FabAgent</a>
+  <div class="d-flex align-items-center gap-3">
+    <a class="nav-link text-light small" href="/radni">Radni ekran</a>
+    <a class="nav-link text-light small" href="/">Šabloni</a>
+    <a class="nav-link text-light small" href="/upload">Upload</a>
+    <a class="nav-link text-light small" href="/camera">Kamera</a>
+    <a class="nav-link text-light small" href="/machine">Laser</a>
+    <a class="nav-link text-light small" href="/history">Istorija</a>
+    <span class="navbar-text small d-none d-lg-inline">v{{ version }} · radi lokalno, bez interneta</span>
+  </div>
+</nav>
+<div class="container-fluid">
+  <div class="row">
+    {% block sidebar %}
+    <aside class="col-lg-2 col-md-3 sidebar border-end py-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h2 class="h6 mb-0">Istorija</h2>
+        <a class="small" href="/history">sve</a>
+      </div>
+      {% if sidebar_jobs %}
+      <ul class="list-unstyled small mb-0">
+        {% for j in sidebar_jobs %}
+        <li class="mb-2">
+          <a href="/history/{{ j.job_id }}" class="text-decoration-none">
+            {{ L.template_icon(j.template) }} {{ L.template_label(j.template) }}
+          </a><br>
+          <span class="text-muted">{{ j.created.replace('T', ' ')[:16] }}</span>
+          {% include "partials/status_badge.html" %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="small text-muted">Još nema buildova.</p>
+      {% endif %}
+    </aside>
+    {% endblock %}
+    <main class="{% block main_class %}col-lg-10 col-md-9 py-3{% endblock %}">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+<script src="/static/bootstrap.bundle.min.js?v={{ asset_v }}"></script>
+<script src="/static/svg-pan-zoom.min.js?v={{ asset_v }}"></script>
+<script src="/static/app.js?v={{ asset_v }}"></script>
+</body>
+</html>

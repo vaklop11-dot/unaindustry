@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Laser{% endblock %}
+{% block content %}
+<h1 class="h4">Upravljanje laserom (GRBL, Web Serial)</h1>
+<div class="alert alert-danger small" role="alert">
+  <strong>Sigurnost:</strong> laser klase 4 – zaštitne naočale za talasnu dužinu lasera, nikad bez nadzora, air assist i
+  aparat za gašenje požara pri ruci. „Stop“ šalje GRBL soft-reset (laser se gasi), ali uvijek znaj gdje je fizički prekidač napajanja.
+</div>
+<div id="serial-unsupported" class="alert alert-warning" hidden>Ovaj browser nema Web Serial API. Koristi Google Chrome ili Microsoft Edge (verzija 89+), na adresi http://127.0.0.1.</div>
+
+<div class="row g-3">
+  <div class="col-xl-5">
+    <div class="card mb-3">
+      <div class="card-header small fw-semibold d-flex align-items-center">Veza
+        <span class="ms-auto badge text-bg-secondary machine-status" id="m-status">Otkopčano</span></div>
+      <div class="card-body">
+        <div class="d-flex flex-wrap gap-2 mb-2">
+          <button class="btn btn-primary" id="m-connect" type="button">Poveži se sa laserom</button>
+          <button class="btn btn-outline-secondary" id="m-disconnect" type="button" disabled>Prekini vezu</button>
+        </div>
+        <p class="small text-muted mb-1">Browser će pitati za COM port. Brzina {{ baud }} baud. Ishodište mašine: {{ origin }}, sto {{ bed[0]|int }}×{{ bed[1]|int }} mm.</p>
+        <p class="small mb-0">Stanje GRBL-a: <strong id="m-grbl">—</strong> · pozicija: <code id="m-pos">—</code></p>
+      </div>
+    </div>
+    <div class="card mb-3">
+      <div class="card-header small fw-semibold">Kontrole</div>
+      <div class="card-body">
+        <div class="d-flex flex-wrap gap-2">
+          <button class="btn btn-outline-dark m-needs-conn" id="m-home" type="button" disabled>Home ({{ home_cmd }})</button>
+          <button class="btn btn-outline-dark m-needs-conn" id="m-unlock" type="button" disabled>Otključaj ($X)</button>
+          <button class="btn btn-outline-primary m-needs-conn m-needs-job" id="m-frame" type="button" disabled>Frame</button>
+          <button class="btn btn-success m-needs-conn m-needs-job" id="m-start" type="button" disabled>Start</button>
+          <button class="btn btn-warning m-needs-conn" id="m-pause" type="button" disabled>⏸ Pause</button>
+          <button class="btn btn-danger m-needs-conn" id="m-stop" type="button" disabled>Stop</button>
+        </div>
+        <div class="progress mt-3" role="progressbar" aria-label="Napredak"><div class="progress-bar" id="m-progress" style="width:0%">0 %</div></div>
+        <p class="small text-muted mt-2 mb-0">Frame obilazi okvir posla sa ugašenim laserom (samo S0/M5). Start radi samo za odobren job i traži potvrdu.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-7">
+    <div class="card mb-3">
+      <div class="card-header small fw-semibold">Posao</div>
+      <div class="card-body" id="m-job" data-job="{{ job.job_id if job else '' }}" data-on-bed="{{ 'true' if on_bed else 'false' }}"
+           data-approved="{{ 'true' if job and job.status == 'approved' else 'false' }}">
+        {% if job %}
+        <p class="mb-2">{{ L.template_icon(job.template) }} <a href="/history/{{ job.job_id }}">{{ L.template_label(job.template) }} – {{ job.slug }}</a>
+          {% set j = job %}{% include "partials/status_badge.html" %}</p>
+        {% if job.status != 'approved' %}
+        <div class="alert alert-warning small py-2" id="m-not-approved">Job nije odobren – možeš raditi Frame, ali Start traži da ga prvo odobriš.</div>
+        {% endif %}
+        <div class="row g-2 mb-2">
+          {% if on_bed %}
+          <div class="col-12 small text-muted" id="m-on-bed">Raspored je već na cijelom stolu – pozicije su apsolutne (pomak 0, 0).</div>
+          {% else %}
+          <div class="col-sm-4"><label class="form-label small mb-0" for="m-x">Pozicija X (mm) <span class="text-danger">*</span></label>
+            <input class="form-control form-control-sm" type="number" step="0.1" id="m-x" placeholder="obavezno"></div>
+          <div class="col-sm-4"><label class="form-label small mb-0" for="m-y">Pozicija Y (mm) <span class="text-danger">*</span></label>
+            <input class="form-control form-control-sm" type="number" step="0.1" id="m-y" placeholder="obavezno"></div>
+          <div class="col-12 small text-muted">X/Y = gornji lijevi ugao dizajna mjereno od gornjeg lijevog ugla stola. Ili ga postavi u <a href="/editor/{{ job.job_id }}">editoru</a>.</div>
+          {% endif %}
+          {% if sheet_count > 1 %}
+          <div class="col-sm-4"><label class="form-label small mb-0" for="m-sheet">Ploča</label>
+            <select class="form-select form-select-sm" id="m-sheet">{% for i in range(1, sheet_count + 1) %}<option value="{{ i }}">{{ i }} / {{ sheet_count }}</option>{% endfor %}</select></div>
+          {% endif %}
+        </div>
+        {% include "partials/layer_manager.html" %}
+        <div class="form-check mt-2">
+          <input class="form-check-input" type="checkbox" id="m-safety">
+          <label class="form-check-label small" for="m-safety">Potvrđujem: materijal je postavljen i fokusiran, naočale na očima, air assist radi, ostajem uz mašinu.</label>
+        </div>
+        {% else %}
+        <p class="small">Izaberi laserski job:</p>
+        <ul class="small mb-0">
+          {% for j in laser_jobs %}<li><a href="/machine?job={{ j.job_id }}">{{ L.template_label(j.template) }} – {{ j.slug }}</a> {% include "partials/status_badge.html" %}</li>
+          {% else %}<li class="text-muted">Nema laserskih jobova.</li>{% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header small fw-semibold d-flex">Konzola <button class="btn btn-sm btn-link ms-auto p-0" id="m-clear" type="button">očisti</button></div>
+      <div class="machine-console" id="m-console" aria-live="polite"></div>
+      <div class="card-body p-2 d-flex gap-2">
+        <input class="form-control form-control-sm font-monospace" id="m-cmd" placeholder="ručna komanda, npr. $$ ili G0 X10 Y10" disabled>
+        <button class="btn btn-sm btn-outline-secondary m-needs-conn" id="m-send" type="button" disabled>Pošalji</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>window.FAB_MACHINE = {baud: {{ baud }}, home: {{ home_cmd|tojson }}};</script>
+<script src="/static/machine.js?v={{ asset_v }}"></script>
+{% endblock %}

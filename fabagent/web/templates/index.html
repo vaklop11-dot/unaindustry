@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Šabloni{% endblock %}
+{% block content %}
+<div class="card card-body mb-4 upload-cta d-flex flex-row align-items-center gap-3 flex-wrap">
+  <div class="template-icon mb-0">{{ L.template_icon('svg_upload') }}</div>
+  <div class="flex-grow-1">
+    <h2 class="h6 mb-1">Imaš svoj SVG?</h2>
+    <p class="small text-muted mb-0">Uploaduj ga: sistem provjeri fajl, spoji otvorene linije, ukloni duple, pretvori tekst u putanje i postavi slojeve za laser.</p>
+  </div>
+  <a class="btn btn-primary btn-lg" href="/upload" id="btn-upload">Uploaduj SVG</a>
+</div>
+<h1 class="h4 mb-3">Izaberi šablon</h1>
+<ul class="nav nav-tabs" role="tablist">
+  {% for kind, (label, tpls) in KINDS.items() %}
+  <li class="nav-item" role="presentation">
+    <button class="nav-link {% if loop.first %}active{% endif %}" data-bs-toggle="tab"
+            data-bs-target="#tab-{{ kind }}" type="button" role="tab">{{ label }}</button>
+  </li>
+  {% endfor %}
+</ul>
+<div class="tab-content pt-3">
+  {% for kind, (label, tpls) in KINDS.items() %}
+  <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="tab-{{ kind }}" role="tabpanel">
+    <div class="row g-3">
+      {% for name, spec in tpls.items() %}
+      <div class="col-sm-6 col-xl-4">
+        <a class="card h-100 template-card text-decoration-none" href="/{{ kind }}/{{ name }}">
+          <div class="card-body">
+            <div class="template-icon">{{ L.template_icon(name) }}</div>
+            <h2 class="h6 card-title mb-1">{{ L.template_label(name) }}</h2>
+            <p class="card-text small text-muted mb-0">{{ spec.description }}</p>
+          </div>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

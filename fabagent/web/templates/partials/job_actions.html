@@ -1,0 +1,27 @@
+{# Akcije za jobove bez forme sablona (raster, litofanija, raspored, upload). #}
+{% if job.warnings %}
+<div class="alert alert-warning small" role="alert"><strong>Upozorenja</strong>
+  <ul class="mb-0">{% for w in job.warnings %}<li>{{ w }}</li>{% endfor %}</ul></div>
+{% endif %}
+{% if job.status == 'approved' %}
+<div class="alert alert-success" role="alert" id="odobreno"><strong>Odobreno i poslano u produkciju.</strong><br>
+  <span class="small">Folder: <code>{{ job.production_dir }}</code></span></div>
+{% endif %}
+<div class="d-flex flex-wrap gap-2">
+  {% if job.status != 'approved' %}
+  <form method="post" action="/job/approve">
+    <input type="hidden" name="job_id" value="{{ job.job_id }}">
+    <button type="submit" class="btn btn-success btn-lg" id="btn-approve" {% if job.blocking %}disabled{% endif %}>Odobri i pošalji u produkciju</button>
+  </form>
+  {% endif %}
+  {% if job.type in ('laser', 'upload', 'raster') and not job.blocking %}
+  <a class="btn btn-outline-danger btn-lg" href="/machine?job={{ job.job_id }}" id="btn-machine">🔴 Pošalji na laser</a>
+  {% endif %}
+  {% if job.type in ('laser', 'upload') and not job.blocking and (job.sheets|default([None]))|length == 1 %}
+  <a class="btn btn-outline-primary btn-lg" href="/editor/{{ job.job_id }}" id="btn-editor">Otvori u editoru</a>
+  {% endif %}
+</div>
+<p class="small mt-2">Fajlovi:
+  {% for f in job.outputs %}<a href="/jobs/{{ job.job_id }}/{{ f }}">{{ f }}</a>{% if not loop.last %} · {% endif %}{% endfor %}
+  {% for g in job.gcode|default([]) %} · <a href="/api/jobs/{{ job.job_id }}/gcode/{{ g.file }}">{{ g.file }}</a>{% endfor %}
+</p>

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Raspored {{ job.slug }}{% endblock %}
+{% block content %}
+{% set j = job %}
+<nav aria-label="breadcrumb"><ol class="breadcrumb small mb-2">
+  <li class="breadcrumb-item"><a href="/history">Istorija</a></li>
+  <li class="breadcrumb-item active">{{ job.job_id }}</li>
+</ol></nav>
+<h1 class="h4">📐 Raspored na stolu: {{ job.slug }} {% include "partials/status_badge.html" %}</h1>
+<p class="small text-muted">Napravljeno u editoru{% if job.source_job %} iz joba <a href="/history/{{ job.source_job }}">{{ job.source_job }}</a>{% endif %}.
+  Pozicije su apsolutne na stolu {{ C.LASER_WORK_AREA_MM[0]|int }}×{{ C.LASER_WORK_AREA_MM[1]|int }} mm.</p>
+{% if banner %}{% include "partials/error_banner.html" %}{% endif %}
+<div class="row g-3">
+  <div class="col-xl-8">{% include "partials/preview_laser.html" %}</div>
+  <div class="col-xl-4">{% include "partials/job_actions.html" %}</div>
+</div>
+{% endblock %}

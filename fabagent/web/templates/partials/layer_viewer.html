@@ -1,0 +1,31 @@
+{# Interaktivni pregled (pan/zoom + slojevi). SVG je generisan od strane FabAgent-a, pa se ubacuje direktno u DOM. #}
+<div class="layer-viewer">
+  <div class="layer-manager d-flex flex-wrap align-items-center gap-3 mb-2" role="group" aria-label="Slojevi">
+    <span class="small fw-semibold">Slojevi:</span>
+    {% for layer, boja, opis in [('CUT', 'crvena', 'rezanje'), ('ENGRAVE', 'crna', 'graviranje'), ('SCORE', 'plava', 'označavanje')] %}
+    <div class="form-check form-check-inline mb-0">
+      <input class="form-check-input layer-toggle" type="checkbox" id="lt-{{ layer }}-{{ viewer_id|default('v') }}"
+             data-layer="{{ layer }}" checked>
+      <label class="form-check-label small" for="lt-{{ layer }}-{{ viewer_id|default('v') }}">
+        <i class="sw" style="background:{{ C.LAYER_COLORS[layer] }}"></i> {{ boja }} = {{ layer }} <span class="text-muted">({{ opis }})</span>
+      </label>
+    </div>
+    {% endfor %}
+    <button type="button" class="btn btn-sm btn-outline-secondary ms-auto pz-reset">Prikaži sve</button>
+  </div>
+  <div class="camera-controls d-flex flex-wrap align-items-center gap-2 mb-2 small" data-opacity="{{ C.CAMERA_OVERLAY_OPACITY }}">
+    <button type="button" class="btn btn-sm btn-outline-dark cam-show">📷 Prikaži kameru</button>
+    <button type="button" class="btn btn-sm btn-outline-secondary cam-refresh" disabled>Osvježi kameru</button>
+    <button type="button" class="btn btn-sm btn-outline-secondary cam-hide" disabled>Sakrij kameru</button>
+    <label class="ms-2" title="Gdje će početak ovog dokumenta biti na stolu lasera - samo za prikaz">Pozicija na stolu X
+      <input type="number" class="form-control form-control-sm d-inline-block cam-x" style="width:5.5rem" value="0" step="any"> mm</label>
+    <label>Y <input type="number" class="form-control form-control-sm d-inline-block cam-y" style="width:5.5rem" value="0" step="any"> mm</label>
+    <span class="camera-msg text-muted"></span>
+  </div>
+  {% for sh in sheet_views %}
+  {% if sheet_views|length > 1 %}<h3 class="h6 mt-2 mb-1">Ploča {{ loop.index }}{% if sh.time_s %} <span class="text-muted small">({{ sh.time_s }} s)</span>{% endif %}</h3>{% endif %}
+  <div class="svg-container" id="svg-container{% if not loop.first %}-{{ loop.index }}{% endif %}{% if viewer_id %}-{{ viewer_id }}{% endif %}"
+       data-pan-zoom aria-label="Pregled ploče {{ loop.index }}">{{ sh.inline|safe }}</div>
+  {% endfor %}
+  <p class="small text-muted mt-1 mb-0">Točkić miša = zoom, povlačenje = pomjeranje, dvoklik = uvećanje. Linije su prikazane debljinom 1 px bez obzira na zoom.</p>
+</div>

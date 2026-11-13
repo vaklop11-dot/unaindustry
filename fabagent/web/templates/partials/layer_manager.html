@@ -1,0 +1,16 @@
+{# Layer Manager (LightBurn stil): mod, brzina, snaga, prolazi, interval po sloju. Puni ga /static/layers.js. #}
+<div class="card layer-manager-card" data-job="{{ job.job_id }}">
+  <div class="card-header small fw-semibold d-flex align-items-center">Cuts / Layers
+    <span class="ms-auto text-muted fw-normal lm-source"></span></div>
+  <div class="card-body p-2">
+    <table class="table table-sm align-middle small mb-2 lm-table">
+      <thead><tr><th></th><th>Sloj</th><th>Režim</th><th title="mm/s">Brzina</th><th title="%">Snaga</th><th>Broj prolaza</th><th title="mm">Interval</th><th>Prikaži</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="d-flex align-items-center gap-2">
+      <button type="button" class="btn btn-sm btn-primary lm-save">Sačuvaj postavke slojeva</button>
+      <span class="lm-msg small"></span>
+    </div>
+  </div>
+</div>
+<script src="/static/layers.js?v={{ asset_v }}"></script>

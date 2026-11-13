@@ -1,0 +1,50 @@
+{# Opcije trasiranja slike. Prazna opciona polja = ta obrada se ne primjenjuje. #}
+{% set v = values or {} %}
+{% set vtracer = trace_engine_status() %}
+<div class="row g-2">
+  <div class="col-sm-6">
+    <label class="form-label small mb-1" for="nacin_praga{{ sfx }}">Način praga</label>
+    <select class="form-select form-select-sm trace-mode" id="nacin_praga{{ sfx }}" name="nacin_praga">
+      <option value="fiksni" {% if v.get('nacin_praga', 'fiksni') != 'adaptivni' %}selected{% endif %}>Fiksni (threshold)</option>
+      <option value="adaptivni" {% if v.get('nacin_praga') == 'adaptivni' %}selected{% endif %}>Adaptivni (neravnomjerno osvjetljenje)</option>
+    </select>
+  </div>
+  <div class="col-sm-6">
+    <label class="form-label small mb-1" for="motor{{ sfx }}">Motor trasiranja</label>
+    <select class="form-select form-select-sm" id="motor{{ sfx }}" name="motor">
+      <option value="potrace" {% if v.get('motor', 'potrace') == 'potrace' %}selected{% endif %}>potrace – glatke krivulje</option>
+      <option value="konture" {% if v.get('motor') == 'konture' %}selected{% endif %}>OpenCV konture – oštri uglovi</option>
+      <option value="vtracer" {% if v.get('motor') == 'vtracer' %}selected{% endif %} {% if not vtracer[0] %}disabled{% endif %}>vtracer{% if not vtracer[0] %} (nedostupan){% endif %}</option>
+    </select>
+    {% if not vtracer[0] %}<div class="form-text text-warning-emphasis">{{ vtracer[1] }}</div>{% endif %}
+  </div>
+  <div class="col-12 thr-fixed">
+    <label class="form-label small mb-1" for="prag{{ sfx }}">Threshold – gornja granica (0–255) <span class="text-danger thr-req">*</span>
+      <span class="badge text-bg-light range-out">{{ v.get('prag') or '—' }}</span></label>
+    <input class="form-range range-link" type="range" min="{{ C.IMAGE_THRESHOLD_MIN }}" max="{{ C.IMAGE_THRESHOLD_MAX }}" value="{{ v.get('prag') or 128 }}" data-target="prag{{ sfx }}">
+    <input class="form-control form-control-sm" type="number" id="prag{{ sfx }}" name="prag" min="{{ C.IMAGE_THRESHOLD_MIN }}" max="{{ C.IMAGE_THRESHOLD_MAX }}" step="1" value="{{ v.get('prag', '') }}" placeholder="npr. 128">
+    <div class="form-text">Pikseli tamniji od praga postaju crtež. U adaptivnom načinu je opciono (dodatna gornja granica).</div>
+  </div>
+  <div class="col-sm-6">
+    <label class="form-label small mb-1" for="cutoff{{ sfx }}">Cutoff – donja granica (0–255)</label>
+    <input class="form-control form-control-sm" type="number" id="cutoff{{ sfx }}" name="cutoff" min="0" max="255" step="1" value="{{ v.get('cutoff', '') }}" placeholder="prazno = bez">
+    <div class="form-text">Ignoriši piksele tamnije od ovoga.</div>
+  </div>
+  <div class="col-sm-6">
+    <label class="form-label small mb-1" for="uklanjanje_suma{{ sfx }}">Uklanjanje šuma (0–{{ C.TRACE_DENOISE_MAX }})
+      <span class="badge text-bg-light range-out">{{ v.get('uklanjanje_suma') or '—' }}</span></label>
+    <input class="form-range range-link" type="range" min="0" max="{{ C.TRACE_DENOISE_MAX }}" value="{{ v.get('uklanjanje_suma') or 0 }}" data-target="uklanjanje_suma{{ sfx }}">
+    <input class="form-control form-control-sm" type="number" id="uklanjanje_suma{{ sfx }}" name="uklanjanje_suma" min="0" max="{{ C.TRACE_DENOISE_MAX }}" step="1" value="{{ v.get('uklanjanje_suma', '') }}" placeholder="prazno = bez">
+  </div>
+  <div class="col-sm-6">
+    <label class="form-label small mb-1" for="pojednostavljenje{{ sfx }}">Pojednostavljenje – RDP (0–{{ C.TRACE_SIMPLIFY_MAX_PX }} px)</label>
+    <input class="form-control form-control-sm" type="number" id="pojednostavljenje{{ sfx }}" name="pojednostavljenje" min="0" max="{{ C.TRACE_SIMPLIFY_MAX_PX }}" step="0.1" value="{{ v.get('pojednostavljenje', '') }}" placeholder="prazno = bez">
+    <div class="form-text">Veća vrijednost = manje tačaka, grublji oblik.</div>
+  </div>
+  <div class="col-sm-6 d-flex align-items-end">
+    <div class="form-check mb-2">
+      <input class="form-check-input" type="checkbox" id="invertuj{{ sfx }}" name="invertuj" value="true" {% if v.get('invertuj') in ('true', 'on', '1') %}checked{% endif %}>
+      <label class="form-check-label small" for="invertuj{{ sfx }}">Invertuj (svijetao crtež na tamnoj podlozi)</label>
+    </div>
+  </div>
+</div>

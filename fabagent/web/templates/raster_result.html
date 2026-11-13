@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Raster: {{ job.params.fajl }}{% endblock %}
+{% block content %}
+{% set j = job %}
+<nav aria-label="breadcrumb"><ol class="breadcrumb small mb-2">
+  <li class="breadcrumb-item"><a href="/upload">Upload</a></li>
+  <li class="breadcrumb-item active">{{ job.params.fajl }}</li>
+</ol></nav>
+<h1 class="h4">🖼️ Raster gravura: {{ job.params.fajl }} {% include "partials/status_badge.html" %}</h1>
+<p class="small text-muted">Image Mode: <strong>{{ job.params.mode }}</strong>{% if job.params.algorithm %} ({{ job.params.algorithm }}){% endif %}{% if job.params.negative %} · Negative{% endif %}
+  · {{ job.summary.pixels[0] }}×{{ job.summary.pixels[1] }} linija-piksela · interval {{ job.raster.interval_mm }} mm · materijal {{ job.preset_name }}</p>
+{% if banner %}{% include "partials/error_banner.html" %}{% endif %}
+{% if job.preset_verified == false %}
+<div class="alert alert-warning small" role="alert" id="preset-banner"><strong>Preset nije provjeren na tvojoj mašini.</strong> Uradi test-grid u LightBurn-u i ažuriraj presets.py.</div>
+{% endif %}
+<div class="row g-3 mb-3">
+  <div class="col-lg-6"><div class="card h-100"><div class="card-header small fw-semibold">Original</div>
+    <div class="card-body"><div class="svg-stage"><img src="{{ original_uri }}" alt="Original" class="svg-preview" id="img-original"></div></div></div></div>
+  <div class="col-lg-6"><div class="card h-100"><div class="card-header small fw-semibold">Mapa snage (tamno = jači laser)</div>
+    <div class="card-body"><div class="svg-stage"><img src="{{ raster_uri }}" alt="Raster" class="svg-preview raster-preview" id="img-raster"></div></div></div></div>
+</div>
+<div class="row g-3">
+  <div class="col-lg-6">
+    <table class="table table-sm small">
+      <tr><th>Dimenzije</th><td>{{ '%.2f'|format(job.summary.document_mm.width) }} × {{ '%.2f'|format(job.summary.document_mm.height) }} mm</td></tr>
+      <tr><th>Procijenjeno vrijeme</th><td><strong>{{ job.summary.time_human }}</strong> (preset {{ job.preset }})</td></tr>
+      <tr><th>Udio piksela sa laserom</th><td>{{ '%.1f'|format(job.summary.burn_ratio * 100) }} %</td></tr>
+      {% for n in job.notes|default([]) %}<tr><th>Napomena</th><td>{{ n }}</td></tr>{% endfor %}
+    </table>
+  </div>
+  <div class="col-lg-6">{% include "partials/job_actions.html" %}</div>
+</div>
+{% endblock %}

@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% block title %}Upload fajla{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb"><ol class="breadcrumb small mb-2">
+  <li class="breadcrumb-item"><a href="/">Šabloni</a></li>
+  <li class="breadcrumb-item active">Upload SVG</li>
+</ol></nav>
+<h1 class="h4">{{ L.template_icon('svg_upload') }} Uploaduj fajl (SVG, DXF, PDF, PNG, JPG)</h1>
+<p class="text-muted small">Fajl se obrađuje lokalno na ovom računaru. Ništa se ne šalje na internet.</p>
+{% if banner %}{% include "partials/error_banner.html" %}{% endif %}
+<div class="row g-4">
+  <div class="col-xl-6">
+    <form class="card card-body" method="post" action="/upload" enctype="multipart/form-data" id="upload-form">
+      <div class="mb-3">
+        <label class="form-label" for="fajl">Fajl <span class="text-danger">*</span></label>
+        <input class="form-control" type="file" id="fajl" name="fajl" accept="{{ accept }},image/svg+xml,image/png,image/jpeg,application/pdf" required>
+        <div class="form-text">SVG, DXF, PDF (vektorski), PNG ili JPG · najviše {{ max_mb }} MB. Format se prepoznaje po ekstenziji: <strong id="detected-format">—</strong></div>
+        <div class="form-text">LightBurn projekti (.lbrn, .lbrn2) i slobodan uvoz bez provjera otvaraju se u <a href="/radni">Radnom ekranu</a> → Uvezi.</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="materijal">Materijal <span class="text-danger">*</span></label>
+        <select class="form-select" id="materijal" name="materijal" required>
+          <option value="" {% if not materijal %}selected{% endif %}>— izaberi —</option>
+          {% for m in C.LASER_MATERIALS_ALL %}
+          <option value="{{ m }}" {% if materijal == m %}selected{% endif %}>{{ L.choice_label('materijal', m) }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text">Potreban za preset lasera i procjenu vremena.</div>
+      </div>
+      <fieldset class="border rounded p-3 mb-3 fmt-fields" data-formats="png,jpg,jpeg" id="background-fields">
+        <legend class="float-none w-auto px-2 small fw-semibold mb-0">Uklanjanje pozadine</legend>
+        <p class="small text-muted mb-2">Pokreće se samo ako zadaš okvir. Vrijednosti su dijelovi slike: 0 = lijeva/gornja ivica, 1 = desna/donja. Primjenjuje se prije svega ostalog.</p>
+        <div class="row g-2 mb-2">
+          <div class="col-12"><span class="small fw-semibold">Okvir oko motiva</span></div>
+          {% for f, lbl in [('okvir_lijevo', 'lijevo'), ('okvir_gore', 'gore'), ('okvir_desno', 'desno'), ('okvir_dolje', 'dolje')] %}
+          <div class="col-6 col-sm-3">
+            <label class="form-label small mb-1" for="{{ f }}">{{ lbl }}</label>
+            <input class="form-control form-control-sm" type="number" id="{{ f }}" name="{{ f }}" min="0" max="1" step="any" value="{{ values.get(f, '') }}">
+          </div>
+          {% endfor %}
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-12"><span class="small fw-semibold">Sigurni motiv</span> <span class="small text-muted">– ono što se ne smije odbaciti (npr. glava kad je odjeća iste boje kao zid)</span></div>
+          {% for f, lbl in [('motiv_lijevo', 'lijevo'), ('motiv_gore', 'gore'), ('motiv_desno', 'desno'), ('motiv_dolje', 'dolje')] %}
+          <div class="col-6 col-sm-3">
+            <label class="form-label small mb-1" for="{{ f }}">{{ lbl }}</label>
+            <input class="form-control form-control-sm" type="number" id="{{ f }}" name="{{ f }}" min="0" max="1" step="any" value="{{ values.get(f, '') }}">
+          </div>
+          {% endfor %}
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-12"><span class="small fw-semibold">Izbaci</span> <span class="small text-muted">– sigurna pozadina (npr. predmeti koji su ušli u okvir)</span></div>
+          {% for f, lbl in [('izbaci_lijevo', 'lijevo'), ('izbaci_gore', 'gore'), ('izbaci_desno', 'desno'), ('izbaci_dolje', 'dolje')] %}
+          <div class="col-6 col-sm-3">
+            <label class="form-label small mb-1" for="{{ f }}">{{ lbl }}</label>
+            <input class="form-control form-control-sm" type="number" id="{{ f }}" name="{{ f }}" min="0" max="1" step="any" value="{{ values.get(f, '') }}">
+          </div>
+          {% endfor %}
+        </div>
+        <div class="row g-2">
+          <div class="col-sm-4">
+            <label class="form-label small mb-1" for="pozadina">Pozadina postaje</label>
+            <select class="form-select form-select-sm" id="pozadina" name="pozadina">
+              {% for v, lbl in [('bijela', 'Bijela – ne gravira se'), ('crna', 'Crna'), ('providna', 'Providna (PNG alfa)')] %}
+              <option value="{{ v }}" {% if values.get('pozadina', 'bijela') == v %}selected{% endif %}>{{ lbl }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label small mb-1" for="iteracije">Iteracije</label>
+            <input class="form-control form-control-sm" type="number" id="iteracije" name="iteracije" min="{{ C.BG_ITERATIONS_RANGE[0] }}" max="{{ C.BG_ITERATIONS_RANGE[1] }}" step="1" value="{{ values.get('iteracije', '') }}" placeholder="{{ C.BG_GRABCUT_ITERATIONS }}">
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label small mb-1" for="omeksaj_ivicu">Omekšaj ivicu (px)</label>
+            <input class="form-control form-control-sm" type="number" id="omeksaj_ivicu" name="omeksaj_ivicu" min="0" max="{{ C.BG_FEATHER_MAX_PX }}" step="1" value="{{ values.get('omeksaj_ivicu', '') }}" placeholder="0">
+          </div>
+        </div>
+      </fieldset>
+      <fieldset class="border rounded p-3 mb-3 fmt-fields" data-formats="png,jpg,jpeg,pdf" id="image-fields">
+        <legend class="float-none w-auto px-2 small fw-semibold mb-0">Trasiranje slike</legend>
+        <p class="small text-muted fmt-note" data-formats="pdf">Za PDF se koristi samo ako PDF sadrži sliku bez vektora (tada se slika trasira; veličina se uzima iz PDF-a).</p>
+        <div class="mb-3 fmt-sub" data-formats="png,jpg,jpeg">
+          <label class="form-label" for="sirina_mm">Širina na materijalu (mm) <span class="text-danger">*</span></label>
+          <input class="form-control" type="number" id="sirina_mm" name="sirina_mm" min="{{ C.IMAGE_WIDTH_MIN_MM }}" max="{{ C.LASER_WORK_AREA_MM[0] }}" step="any" value="{{ values.get('sirina_mm', '') }}">
+          <div class="form-text">DPI slike se ne pogađa – zadaj koliko široka treba biti gravura. Visina slijedi iz omjera slike.</div>
+        </div>
+        <div class="row g-2 mb-2 fmt-sub" data-formats="png,jpg,jpeg">
+          <div class="col-sm-6">
+            <label class="form-label small mb-1" for="izlaz">Izlaz <span class="text-danger">*</span></label>
+            <select class="form-select form-select-sm" id="izlaz" name="izlaz">
+              <option value="2d" {% if values.get('izlaz', '2d') != '3d' %}selected{% endif %}>2D gravura (laser)</option>
+              <option value="3d" {% if values.get('izlaz') == '3d' %}selected{% endif %}>3D litofanija / reljef (STL)</option>
+            </select>
+          </div>
+          <div class="col-sm-6 out-2d">
+            <label class="form-label small mb-1" for="rezim_slike">Image Mode <span class="text-danger">*</span></label>
+            <select class="form-select form-select-sm" id="rezim_slike" name="rezim_slike">
+              {% for m, lbl in [('threshold', 'Threshold – popunjeni oblici (vektor)'), ('dither', 'Dither – tačkice (raster)'), ('grayscale', 'Grayscale – varijacija snage (raster)'), ('vectorize', 'Vectorize – obrisi (vektor)')] %}
+              <option value="{{ m }}" {% if values.get('rezim_slike', 'threshold') == m %}selected{% endif %}>{{ lbl }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="negativ" name="negativ" value="true" {% if values.get('negativ') in ('true', 'on') %}checked{% endif %}>
+              <label class="form-check-label small" for="negativ">Negative (crtež svijetao na tamnoj podlozi / obrnuti tonovi)</label>
+            </div>
+          </div>
+        </div>
+        <div class="row g-2 mb-2 out-raster">
+          <div class="col-sm-4 mode-dither">
+            <label class="form-label small mb-1" for="algoritam">Dither algoritam <span class="text-danger">*</span></label>
+            <select class="form-select form-select-sm" id="algoritam" name="algoritam">
+              <option value="">— izaberi —</option>
+              {% for a, lbl in [('floyd-steinberg', 'Floyd–Steinberg'), ('jarvis', 'Jarvis–Judice–Ninke'), ('stucki', 'Stucki')] %}
+              <option value="{{ a }}" {% if values.get('algoritam') == a %}selected{% endif %}>{{ lbl }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-sm-4 mode-grayscale">
+            <label class="form-label small mb-1" for="min_snaga_posto">Min. snaga za sivo (%)</label>
+            <input class="form-control form-control-sm" type="number" id="min_snaga_posto" name="min_snaga_posto" min="0" max="100" step="1" value="{{ values.get('min_snaga_posto', '') }}" placeholder="prazno = 0">
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label small mb-1" for="interval_mm">Interval linija (mm)</label>
+            <input class="form-control form-control-sm" type="number" id="interval_mm" name="interval_mm" min="{{ C.LAYER_INTERVAL_RANGE_MM[0] }}" max="{{ C.LAYER_INTERVAL_RANGE_MM[1] }}" step="0.01" value="{{ values.get('interval_mm', '') }}" placeholder="prazno = iz preseta">
+          </div>
+          <p class="small text-muted mb-0">Raster: 1 piksel = 1 linija graviranja. Rezultat je mapa snage + G-code (bez SVG-a).</p>
+        </div>
+        <div class="row g-2 mb-2 out-3d">
+          <div class="col-sm-6">
+            <label class="form-label small mb-1" for="nacin_3d">Način <span class="text-danger">*</span></label>
+            <select class="form-select form-select-sm" id="nacin_3d" name="nacin_3d">
+              <option value="">— izaberi —</option>
+              <option value="litofanija" {% if values.get('nacin_3d') == 'litofanija' %}selected{% endif %}>Litofanija (tamnije = deblje, za pozadinsko svjetlo)</option>
+              <option value="reljef" {% if values.get('nacin_3d') == 'reljef' %}selected{% endif %}>Reljef (svjetlije = više)</option>
+            </select>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label small mb-1" for="filament">Filament <span class="text-danger">*</span></label>
+            <select class="form-select form-select-sm" id="filament" name="filament">
+              <option value="">— izaberi —</option>
+              {% for f in C.FILAMENTS %}<option value="{{ f }}" {% if values.get('filament') == f %}selected{% endif %}>{{ f }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label small mb-1" for="min_debljina_mm">Min. debljina (mm) <span class="text-danger">*</span></label>
+            <input class="form-control form-control-sm" type="number" id="min_debljina_mm" name="min_debljina_mm" min="{{ C.LITHO_MIN_THICKNESS_MM }}" max="{{ C.LITHO_MAX_THICKNESS_MM }}" step="0.1" value="{{ values.get('min_debljina_mm', '') }}" placeholder="npr. 0.8">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label small mb-1" for="max_debljina_mm">Max. debljina (mm) <span class="text-danger">*</span></label>
+            <input class="form-control form-control-sm" type="number" id="max_debljina_mm" name="max_debljina_mm" min="{{ C.LITHO_MIN_THICKNESS_MM }}" max="{{ C.LITHO_MAX_THICKNESS_MM }}" step="0.1" value="{{ values.get('max_debljina_mm', '') }}" placeholder="npr. 3.0">
+          </div>
+          <p class="small text-muted mb-0">Širina 3D modela: {{ C.LITHO_WIDTH_RANGE_MM[0]|int }}–{{ C.LITHO_WIDTH_RANGE_MM[1]|int }} mm. Mreža {{ 1 / C.LITHO_PX_PER_MM }} mm.</p>
+        </div>
+        <div class="out-trace">{% set sfx = '' %}{% include "partials/trace_fields.html" %}</div>
+      </fieldset>
+      <fieldset class="border rounded p-3 mb-3 fmt-fields" data-formats="dxf" id="dxf-fields">
+        <legend class="float-none w-auto px-2 small fw-semibold mb-0">DXF</legend>
+        <label class="form-label" for="jedinice">Jedinice crteža</label>
+        <select class="form-select" id="jedinice" name="jedinice">
+          <option value="">— iz DXF zaglavlja ($INSUNITS) —</option>
+          {% for u in dxf_units %}<option value="{{ u }}" {% if values.get('jedinice') == u %}selected{% endif %}>{{ u }}</option>{% endfor %}
+        </select>
+        <div class="form-text">Potrebno samo ako DXF nema zapisane jedinice – inače se koriste one iz fajla.</div>
+      </fieldset>
+      <button type="submit" class="btn btn-primary btn-lg">Pretvori, provjeri i popravi</button>
+    </form>
+  </div>
+  <div class="col-xl-6">
+    <div class="card card-body small">
+      <h2 class="h6">Šta se automatski radi</h2>
+      <ul class="mb-2">
+        <li>DXF, PDF i slike se prvo pretvore u SVG (DXF: linije, krugovi, lukovi, polilinije; PDF: vektorski crteži; slike: trasiranje), pa idu kroz isti popravak kao SVG.</li>
+        <li>Otvorene linije čiji su krajevi bliži od {{ C.UPLOAD_JOIN_TOL_MM }} mm se spajaju u zatvorene konture.</li>
+        <li>Duple linije (poklapanje unutar {{ C.UPLOAD_DUP_TOL_MM }} mm) se uklanjaju.</li>
+        <li>Tekst se pretvara u putanje ugrađenim blok-fontom (samo VELIKA slova, cifre i osnovni znakovi).</li>
+        <li>Debljina linija postaje {{ C.SVG_STROKE_WIDTH_MM }} mm. Popunjeni oblici idu u ENGRAVE (crno), plave linije u SCORE, ostale linije u CUT (crveno).</li>
+      </ul>
+      <h2 class="h6">Šta se ne pogađa</h2>
+      <p class="mb-0">Ako se nešto ne može popraviti bez pretpostavke (npr. veći razmak krajeva, mala slova u tekstu, &lt;use&gt; klonovi), to se prikaže crveno i odobravanje nije moguće dok ne ispraviš fajl.</p>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  const file = document.getElementById("fajl"), out = document.getElementById("detected-format");
+  function update() {
+    const name = (file.files[0] && file.files[0].name) || "";
+    const ext = name.includes(".") ? name.split(".").pop().toLowerCase() : "";
+    out.textContent = ext ? ext.toUpperCase() : "—";
+    // fieldset i pod-blokovi se prikazuju samo za odgovarajuci format; skrivena polja se ne salju
+    document.querySelectorAll(".fmt-fields, .fmt-sub, .fmt-note").forEach((el) => {
+      el.hidden = !el.dataset.formats.split(",").includes(ext);
+    });
+    const isImage = ["png", "jpg", "jpeg"].includes(ext);
+    const out3d = isImage && document.getElementById("izlaz").value === "3d";
+    const mode = document.getElementById("rezim_slike").value;
+    const raster = isImage && !out3d && (mode === "dither" || mode === "grayscale");
+    document.querySelectorAll(".out-2d").forEach((el) => { el.hidden = out3d; });
+    document.querySelectorAll(".out-3d").forEach((el) => { el.hidden = !out3d; });
+    document.querySelectorAll(".out-raster").forEach((el) => { el.hidden = !raster; });
+    document.querySelectorAll(".out-trace").forEach((el) => { el.hidden = out3d || raster; });
+    document.querySelectorAll(".mode-dither").forEach((el) => { el.hidden = mode !== "dither"; });
+    document.querySelectorAll(".mode-grayscale").forEach((el) => { el.hidden = mode !== "grayscale"; });
+    document.querySelectorAll(".fmt-fields input, .fmt-fields select").forEach((el) => {
+      el.disabled = !!el.closest("[hidden]");
+    });
+    // threshold vrijednost je potrebna i za raster threshold; materijal nije potreban za 3D
+    document.getElementById("materijal").required = !out3d;
+  }
+  file.addEventListener("change", update);
+  ["izlaz", "rezim_slike"].forEach((id) => document.getElementById(id).addEventListener("change", update));
+  update();
+})();
+</script>
+{% endblock %}

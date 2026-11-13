@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}3D: {{ job.params.nacin_3d }}{% endblock %}
+{% block content %}
+{% set j = job %}
+<nav aria-label="breadcrumb"><ol class="breadcrumb small mb-2">
+  <li class="breadcrumb-item"><a href="/upload">Upload</a></li>
+  <li class="breadcrumb-item active">{{ job.slug }}</li>
+</ol></nav>
+<h1 class="h4">🧊 3D {{ 'litofanija' if job.params.nacin_3d == 'litofanija' else 'reljef' }} iz slike {% include "partials/status_badge.html" %}</h1>
+<p class="small text-muted">Debljina {{ job.params.min_debljina_mm }}–{{ job.params.max_debljina_mm }} mm ·
+  {{ 'tamnije = deblje' if job.params.nacin_3d == 'litofanija' else 'svjetlije = više' }}{% if job.params.negativ %} · Negative{% endif %}
+  · mreža {{ job.summary.info.grid[0] }}×{{ job.summary.info.grid[1] }} ({{ job.summary.info.step_mm }} mm) · {{ job.params.filament }}</p>
+{% if banner %}{% include "partials/error_banner.html" %}{% endif %}
+<div class="row g-3">
+  <div class="col-xl-3 col-lg-4">
+    <div class="card"><div class="card-header small fw-semibold">Original</div>
+      <div class="card-body"><img src="{{ original_uri }}" alt="Original" class="img-fluid" id="img-original"></div></div>
+    {% if job.params.nacin_3d == 'litofanija' %}
+    <p class="small text-muted mt-2">Litofanija se štampa uspravno ili ravno, 100 % ispuna; slika se vidi kad je osvijetljena odpozadi.</p>
+    {% endif %}
+  </div>
+  <div class="col-xl-9 col-lg-8">
+    {% include "partials/preview_3d.html" %}
+    {% include "partials/job_actions.html" %}
+  </div>
+</div>
+{% endblock %}

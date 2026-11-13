@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Editor {{ job.slug }}{% endblock %}
+{% block sidebar %}{% endblock %}
+{% block main_class %}col-12 p-0{% endblock %}
+{% block content %}
+<div class="lb-app">
+  <div class="lb-topbar editor-toolbar">
+    <label class="lb-field">X <input type="number" step="0.1" class="form-control form-control-sm obj-field" id="ed-x"> mm</label>
+    <label class="lb-field">Y <input type="number" step="0.1" class="form-control form-control-sm obj-field" id="ed-y"> mm</label>
+    <label class="lb-field">Širina <input type="number" step="0.1" class="form-control form-control-sm" id="ed-w" readonly> mm</label>
+    <label class="lb-field">Visina <input type="number" step="0.1" class="form-control form-control-sm" id="ed-h" readonly> mm</label>
+    <label class="lb-field">Rotacija <input type="number" step="1" class="form-control form-control-sm obj-field" id="ed-r"> °</label>
+    <label class="lb-field form-check-label"><input type="checkbox" class="form-check-input" id="ed-lock-scale" checked> zaključaj veličinu</label>
+    <button class="btn btn-sm btn-outline-secondary" id="ed-select-all" type="button">Izaberi sve</button>
+    <a class="lb-job ms-auto" href="/history/{{ job.job_id }}">{{ job.slug }}</a>
+    <button class="btn btn-sm btn-primary" id="ed-save" type="button" title="Pravi novi job; original ostaje nepromijenjen">Sačuvaj raspored</button>
+  </div>
+
+  <div class="lb-tools" role="toolbar" aria-label="Alati" aria-orientation="vertical">
+    <button type="button" class="lb-tool active" title="Selektuj" aria-label="Selektuj" aria-pressed="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3l12 9-5.5 1 3 6.5-2.2 1-3-6.5L6 18z" fill="currentColor"/></svg>
+    </button>
+  </div>
+
+  <div class="lb-workspace">
+    <div class="editor-stage" id="editor-stage" data-job="{{ job.job_id }}">
+      <canvas id="ruler-top" class="ruler ruler-top"></canvas>
+      <canvas id="ruler-left" class="ruler ruler-left"></canvas>
+      <div class="editor-canvas-wrap"><canvas id="editor-canvas"></canvas></div>
+    </div>
+  </div>
+
+  <div class="lb-side">
+    {% include "partials/layer_manager.html" %}
+    <div class="lb-laser">
+      <a class="btn btn-sm btn-outline-danger" href="/machine?job={{ job.job_id }}">Pošalji na laser</a>
+    </div>
+  </div>
+
+  <div class="lb-status"><div id="editor-msg" class="small" role="status"></div></div>
+</div>
+<script src="/static/fabric.min.js?v={{ asset_v }}"></script>
+<script src="/static/editor.js?v={{ asset_v }}"></script>
+{% endblock %}

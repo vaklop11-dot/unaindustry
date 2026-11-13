@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fabagent"
+version = "0.1.0"
+description = "Deterministicki generator proizvodnih fajlova (laser SVG, FDM STL/3MF)"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.24", "trimesh>=4.0", "svgpathtools>=1.6"]
+
+[project.optional-dependencies]
+test = ["pytest>=7", "httpx>=0.27"]
+web = ["fastapi>=0.110", "uvicorn>=0.29", "jinja2>=3.1", "python-multipart>=0.0.9"]
+# pymupdf 2.x povlaci ML pakete (onnxruntime, pymupdf-layout) - zato <2
+convert = ["ezdxf>=1.3", "pymupdf>=1.24,<2", "potracer>=0.0.4", "opencv-python-headless>=4.8"]
+camera = ["opencv-python-headless>=4.8"]
+# vtracer: eksperimentalno - pokrece se izolovano u zasebnom procesu i automatski se iskljucuje ako se
+# rusi (vtracer 0.6.15 + Python 3.14 + Windows: access violation)
+vtracer = ["vtracer>=0.6"]
+
+[project.scripts]
+fabagent = "fabagent.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["fabagent*"]
+
+[tool.setuptools.package-data]
+"fabagent.web" = ["templates/*.html", "templates/partials/*.html", "static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["fabagent/tests", "fabagent/web/tests"]
+filterwarnings = ["ignore:Using .httpx. with .starlette.testclient. is deprecated"]

@@ -1,0 +1,29 @@
+{% set s = job.summary %}
+{% set m = s.mesh %}
+{% set view_names = {'front': 'Sprijeda', 'side': 'Sa strane', 'top': 'Odozgo', 'iso': 'Izometrijski'} %}
+{% if not m.watertight or m.non_manifold_edges %}
+<div class="alert alert-danger" role="alert">Mesh nije validan – odobravanje nije moguće.</div>
+{% endif %}
+<div class="row g-2 mb-3">
+  {% for name in job.renders %}
+  {% set view = name[5:-4] %}
+  <div class="col-6">
+    <figure class="card mb-0">
+      <img src="/jobs/{{ job.job_id }}/{{ name }}" class="card-img-top render" alt="{{ view_names.get(view, view) }}">
+      <figcaption class="small text-center text-muted py-1">{{ view_names.get(view, view) }}</figcaption>
+    </figure>
+  </div>
+  {% endfor %}
+</div>
+<table class="table table-sm small">
+  <tr><th>Dimenzije (X × Y × Z)</th><td><strong>{{ '%.2f'|format(s.size_mm[0]) }} × {{ '%.2f'|format(s.size_mm[1]) }} × {{ '%.2f'|format(s.size_mm[2]) }} mm</strong></td></tr>
+  <tr><th>Zapremina</th><td>{{ s.volume_cm3 }} cm³</td></tr>
+  <tr><th>Procijenjena masa</th><td>{{ s.mass_g }} g ({{ job.preset }})
+    <span class="text-muted">· {% for k, v in s.mass_by_material_g.items() %}{{ k }} {{ v }} g{% if not loop.last %}, {% endif %}{% endfor %}</span></td></tr>
+  <tr><th>Procijenjeno vrijeme</th><td>{{ s.time_min }} min <span class="text-muted">(gruba procjena)</span></td></tr>
+  <tr><th>Zatvoren mesh (watertight)</th><td>{% if m.watertight %}<span class="text-success">✅ da</span>{% else %}<span class="text-danger">❌ ne</span>{% endif %}</td></tr>
+  <tr><th>Najtanji zid</th><td>{{ m.min_wall_mm }} mm <span class="text-muted">(min {{ C.FDM_MIN_WALL_MM }} mm)</span></td></tr>
+  <tr><th>Non-manifold ivice</th><td>{% if m.non_manifold_edges %}<span class="text-danger fw-bold">{{ m.non_manifold_edges }}</span>{% else %}0{% endif %}</td></tr>
+  <tr><th>Trouglova / tijela</th><td>{{ m.faces }} / {{ m.bodies }}{% for b in s.bodies %} · {{ b.name }}{% endfor %}</td></tr>
+  {% if job.params_defaulted %}<tr><th>Preporučene vrijednosti</th><td>{{ job.params_defaulted|join(', ') }}</td></tr>{% endif %}
+</table>

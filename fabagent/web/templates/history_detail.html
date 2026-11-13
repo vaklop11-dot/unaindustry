@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Job {{ job.job_id }}{% endblock %}
+{% block content %}
+{% set j = job %}
+{% set banner = None %}
+<nav aria-label="breadcrumb"><ol class="breadcrumb small mb-2">
+  <li class="breadcrumb-item"><a href="/history">Istorija</a></li>
+  <li class="breadcrumb-item active">{{ job.job_id }}</li>
+</ol></nav>
+<h1 class="h4">{{ L.template_icon(job.template) }} {{ L.template_label(job.template) }}
+  {% include "partials/status_badge.html" %}</h1>
+<p class="small text-muted">Kreirano {{ job.created.replace('T', ' ') }}{% if job.approved %} · odobreno {{ job.approved.replace('T', ' ') }}{% endif %}</p>
+<a class="btn btn-primary mb-3" href="{{ reopen }}">Otvori u formi sa istim parametrima</a>
+<div class="row g-4">
+  <div class="col-xl-5">
+    <h2 class="h6">Parametri</h2>
+    <table class="table table-sm small">
+      {% for p in KINDS[job.type][1][job.template].params %}{% if p.name in job.params %}
+      <tr><th>{{ L.param_label(job.template, p) }}</th>
+          <td>{{ L.choice_label(p.name, job.params[p.name]) if p.type == 'enum' else job.params[p.name] }}
+          {% if p.name in job.params_defaulted %}<span class="badge text-bg-light">preporučeno</span>{% endif %}</td></tr>
+      {% endif %}{% endfor %}
+    </table>
+  </div>
+  <div class="col-xl-7">
+    {% if job.type == 'laser' %}{% include "partials/preview_laser.html" %}{% else %}{% include "partials/preview_3d.html" %}{% endif %}
+    {% include "partials/actions.html" %}
+  </div>
+</div>
+{% endblock %}

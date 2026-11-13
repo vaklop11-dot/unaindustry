@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}{{ L.template_label(template) }}{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb"><ol class="breadcrumb small mb-2">
+  <li class="breadcrumb-item"><a href="/">Šabloni</a></li>
+  <li class="breadcrumb-item">{{ kind_label }}</li>
+  <li class="breadcrumb-item active">{{ L.template_label(template) }}</li>
+</ol></nav>
+<h1 class="h4">{{ L.template_icon(template) }} {{ L.template_label(template) }}</h1>
+<p class="text-muted small">{{ spec.description }}</p>
+
+<div class="row g-4">
+  <div class="col-xxl-5 col-xl-6">
+    <form id="forma" class="card card-body" method="post" action="/{{ kind }}/{{ template }}/preview" novalidate>
+      <p class="small text-muted mb-2"><span class="text-danger">*</span> obavezno polje</p>
+      {% for f in fields %}
+      <div class="mb-3 field" data-name="{{ f.name }}" data-required="{{ 'true' if f.required else 'false' }}"
+           data-default="{{ f.default }}"
+           {% if f.applies_when %}data-applies-param="{{ f.applies_when.param }}" data-applies-values="{{ f.applies_when['values']|join(',') }}"{% endif %}>
+        <label class="form-label mb-1" for="f-{{ f.name }}">{{ f.label }}{% if f.required %} <span class="text-danger">*</span>{% endif %}</label>
+        {% if f.widget == 'select' %}
+        <select class="form-select{% if f.error %} is-invalid{% endif %}" id="f-{{ f.name }}" name="{{ f.name }}">
+          <option value="" {% if f.value == '' %}selected{% endif %}>— izaberi —</option>
+          {% for v, lbl in f.choices %}
+          <option value="{{ v }}" {% if f.value|string == v %}selected{% endif %}>{{ lbl }}</option>
+          {% endfor %}
+        </select>
+        {% elif f.widget == 'number' %}
+        <input class="form-control{% if f.error %} is-invalid{% endif %}" type="number" id="f-{{ f.name }}" name="{{ f.name }}"
+               value="{{ f.value }}" min="{{ f.min }}" max="{{ f.max }}" step="{{ f.step }}" inputmode="decimal">
+        {% else %}
+        <input class="form-control{% if f.error %} is-invalid{% endif %}" type="text" id="f-{{ f.name }}" name="{{ f.name }}"
+               value="{{ f.value }}" {% if f.maxlength %}maxlength="{{ f.maxlength }}"{% endif %} autocomplete="off">
+        {% endif %}
+        <div class="form-text">{{ f.hint }}</div>
+        {% if f.error %}<div class="invalid-feedback d-block server-error">{{ f.error }}</div>{% endif %}
+        <div class="client-error small text-danger mt-1">Obavezno polje – upiši vrijednost.</div>
+      </div>
+      {% endfor %}
+
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" id="use_defaults" name="use_defaults" value="1" {% if use_defaults %}checked{% endif %}>
+        <label class="form-check-label" for="use_defaults">Koristi preporučene vrijednosti
+          <span class="d-block small text-muted">prazna opciona polja dobijaju preporučenu vrijednost (bilježi se u log)</span></label>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <button type="submit" class="btn btn-primary btn-lg" id="btn-preview">Pregledaj</button>
+        <button type="button" class="btn btn-outline-secondary" id="btn-reset">Resetuj na preporučeno</button>
+      </div>
+      <p class="small text-danger mt-2 mb-0 d-none" id="missing-note">Popuni obavezna polja označena zvjezdicom.</p>
+      {% if share_query %}
+      <p class="small mt-3 mb-0">Dijeljivi link na ovaj unos: <a href="/{{ kind }}/{{ template }}?{{ share_query }}">otvori</a></p>
+      {% endif %}
+    </form>
+  </div>
+
+  <div class="col-xxl-7 col-xl-6" id="pregled">
+    {% if banner %}
+      {% include "partials/error_banner.html" %}
+    {% endif %}
+    {% if job %}
+      {% if kind == 'laser' %}{% include "partials/preview_laser.html" %}{% else %}{% include "partials/preview_3d.html" %}{% endif %}
+      {% include "partials/actions.html" %}
+    {% elif banner %}
+      <div class="d-flex gap-2">
+        <button class="btn btn-success btn-lg" disabled>Odobri i pošalji u produkciju</button>
+        <a class="btn btn-outline-primary btn-lg" href="#forma">Doradi</a>
+      </div>
+      <p class="small text-muted mt-2">Odobravanje nije moguće dok greška nije ispravljena.</p>
+    {% else %}
+      <div class="card card-body text-muted">Popuni parametre i klikni <strong>Pregledaj</strong>. Pregled se pojavljuje ovdje.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% if job.warnings %}
+<div class="alert alert-warning small" role="alert">
+  <strong>Upozorenja</strong>
+  <ul class="mb-0">{% for w in job.warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+{% if job.status == 'approved' %}
+<div class="alert alert-success" role="alert" id="odobreno">
+  <strong>Odobreno i poslano u produkciju.</strong><br>
+  <span class="small">Folder: <code>{{ job.production_dir }}</code> ({{ job.approved.replace('T', ' ') }})</span>
+</div>
+<a class="btn btn-outline-primary" href="/{{ job.type }}/{{ job.template }}?job={{ job.job_id }}#forma">Doradi (novi build)</a>
+{% else %}
+<div class="d-flex flex-wrap gap-2">
+  <form method="post" action="/{{ job.type }}/{{ job.template }}/approve">
+    <input type="hidden" name="job_id" value="{{ job.job_id }}">
+    <button type="submit" class="btn btn-success btn-lg" id="btn-approve" {% if banner %}disabled{% endif %}>Odobri i pošalji u produkciju</button>
+  </form>
+  <a class="btn btn-outline-primary btn-lg" href="/{{ job.type }}/{{ job.template }}?job={{ job.job_id }}#forma" id="btn-doradi">Doradi</a>
+</div>
+<p class="small text-muted mt-2">Odobravanje kopira upravo prikazane fajlove (ponovo validirane) u <code>production/</code>.</p>
+{% endif %}
+{% if job.type == 'laser' %}
+<div class="d-flex flex-wrap gap-2 mt-2">
+  <a class="btn btn-outline-danger" href="/machine?job={{ job.job_id }}" id="btn-machine">🔴 Pošalji na laser</a>
+  {% if (job.sheets|default([None]))|length == 1 %}<a class="btn btn-outline-secondary" href="/editor/{{ job.job_id }}" id="btn-editor">Otvori u editoru</a>{% endif %}
+</div>
+{% endif %}
+<p class="small mt-2">Fajlovi pregleda:
+  {% for f in job.outputs %}<a href="/jobs/{{ job.job_id }}/{{ f }}">{{ f }}</a>{% if not loop.last %} · {% endif %}{% endfor %}
+</p>

@@ -1,0 +1,27 @@
+{% set s = job.summary %}
+{% if job.preset_verified == false %}
+<div class="alert alert-warning" role="alert" id="preset-banner">
+  <strong>Preset nije provjeren na tvojoj mašini.</strong> Uradi test-grid u LightBurn-u i ažuriraj presets.py.
+  <span class="d-block small">Materijal: {{ job.preset_name }} (<code>{{ job.preset }}</code>)</span>
+</div>
+{% endif %}
+<div class="card mb-3">
+  <div class="card-body">
+    {% if sheet_views|length > 1 %}
+    <p class="small mb-2"><strong>{{ sheet_views|length }} ploče</strong> {{ C.LASER_WORK_AREA_MM[0]|int }} × {{ C.LASER_WORK_AREA_MM[1]|int }} mm – dijelovi su automatski raspoređeni sa razmakom {{ C.NEST_GAP_MM }} mm.</p>
+    {% endif %}
+    {% include "partials/layer_viewer.html" %}
+  </div>
+</div>
+<table class="table table-sm small" id="preview-stats">
+  <tr><th>Dimenzije {{ 'ploče' if sheet_views|length > 1 else 'dokumenta' }}</th><td>{{ '%.2f'|format(s.document_mm.width) }} × {{ '%.2f'|format(s.document_mm.height) }} mm{% if sheet_views|length > 1 %} × {{ sheet_views|length }} ploče{% endif %}</td></tr>
+  <tr><th>Broj kontura (ukupno)</th><td>{{ s.layers.CUT.rings + s.layers.ENGRAVE.rings + s.layers.SCORE.rings }}</td></tr>
+  {% for layer in ['CUT', 'ENGRAVE', 'SCORE'] %}
+  <tr><th>{{ layer }}</th><td>putanja {{ s.layers[layer].paths }}, kontura {{ s.layers[layer].rings }}, dužina {{ '%.1f'|format(s.layers[layer].length_mm) }} mm</td></tr>
+  {% endfor %}
+  <tr><th>Procijenjeno vrijeme</th><td><strong>{{ s.time_human }}</strong>
+    <span class="text-muted">(graviranje {{ s.time_by_layer_s.ENGRAVE }} s, rez {{ s.time_by_layer_s.CUT }} s)</span></td></tr>
+  <tr><th>Materijal</th><td>{{ job.preset_name }}</td></tr>
+  {% if job.params_defaulted %}<tr><th>Preporučene vrijednosti</th><td>{{ job.params_defaulted|join(', ') }}</td></tr>{% endif %}
+</table>
+<p class="small">{% for f in job.outputs if f.endswith('.png') %}<a href="/jobs/{{ job.job_id }}/{{ f }}">PNG pregled ({{ f }})</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>

@@ -1,0 +1,7 @@
+<div class="alert alert-danger" role="alert" id="greska">
+  <h2 class="h6 alert-heading mb-1">{{ banner.title }} <code class="small">{{ banner.cls }}</code></h2>
+  <div class="small font-monospace">{{ banner.message }}</div>
+  {% if banner.lines and banner.lines|length > 1 %}
+  <ul class="small mb-0 mt-2">{% for l in banner.lines %}<li>{{ l }}</li>{% endfor %}</ul>
+  {% endif %}
+</div>

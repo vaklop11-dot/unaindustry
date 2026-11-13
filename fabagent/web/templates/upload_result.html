@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Upload: {{ job.params.fajl }}{% endblock %}
+{% block content %}
+{% set rep = job.fix_report %}
+<nav aria-label="breadcrumb"><ol class="breadcrumb small mb-2">
+  <li class="breadcrumb-item"><a href="/upload">Upload SVG</a></li>
+  <li class="breadcrumb-item active">{{ job.params.fajl }}</li>
+</ol></nav>
+<h1 class="h4">{{ L.template_icon('svg_upload') }} {{ job.params.fajl }}
+  {% set j = job %}{% include "partials/status_badge.html" %}</h1>
+<p class="small text-muted">Materijal: {{ job.preset_name }} · dokument {{ '%.2f'|format(job.summary.document_mm.width) }} × {{ '%.2f'|format(job.summary.document_mm.height) }} mm · procjena {{ job.summary.time_human }}</p>
+
+{% if banner %}{% include "partials/error_banner.html" %}{% endif %}
+{% if job.preset_verified == false %}
+<div class="alert alert-warning small" role="alert" id="preset-banner">
+  <strong>Preset nije provjeren na tvojoj mašini.</strong> Uradi test-grid u LightBurn-u i ažuriraj presets.py.
+</div>
+{% endif %}
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header small fw-semibold">Original</div>
+      <div class="card-body">
+        <div class="svg-stage"><img src="{{ original_uri }}" alt="Original" class="svg-preview" id="img-original"></div>
+        {% if job.conversion %}<p class="small text-muted mt-2 mb-0">Izvor: {{ job.conversion.format|upper }}{% if job.conversion.format != 'svg' %} → pretvoreno u SVG{% endif %}</p>{% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header small d-flex flex-wrap align-items-center gap-2">
+        <span class="fw-semibold me-auto">{% if job.blocking %}Pregled (nije spreman za produkciju){% else %}Popravljen{% endif %}</span>
+        <div class="btn-group btn-group-sm view-switch" role="group" aria-label="Prikaz">
+          <button type="button" class="btn btn-outline-primary active" data-view="rezultat" id="btn-show-result">Prikaži rezultat</button>
+          <button type="button" class="btn btn-outline-primary" data-view="original" id="btn-show-original">Prikaži original</button>
+          {% if bitmap_uri %}<button type="button" class="btn btn-outline-primary" data-view="bitmapa" id="btn-show-bitmap">Obrađena bitmapa</button>{% endif %}
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="view-pane" data-pane="rezultat">
+          <div id="img-fixed">{% set viewer_id = 'fix' %}{% include "partials/layer_viewer.html" %}</div>
+          {% if job.blocking %}<div class="legend small mt-2"><span><i class="sw" style="background:#ff8800"></i> otvorena putanja (ne može se zatvoriti)</span></div>{% endif %}
+        </div>
+        <div class="view-pane" data-pane="original" hidden>
+          <div class="svg-stage"><img src="{{ original_uri }}" alt="Original" class="svg-preview"></div>
+        </div>
+        {% if bitmap_uri %}
+        <div class="view-pane" data-pane="bitmapa" hidden>
+          <div class="svg-stage"><img src="{{ bitmap_uri }}" alt="Obrađena bitmapa" class="svg-preview" id="img-bitmap"></div>
+          <p class="small text-muted mt-1 mb-0">Crno = dio crteža nakon praga, cutoff-a, inverta i uklanjanja šuma (prije trasiranja).</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    {% if job.blocking %}
+    <div class="alert alert-danger" role="alert" id="blocking">
+      <strong>Nije moguće odobriti – ispravi u editoru:</strong>
+      <ul class="mb-0 small">{% for b in job.blocking %}<li>{{ b }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+    <div class="card card-body mb-3">
+      <h2 class="h6">Šta je popravljeno</h2>
+      <ul class="small mb-0" id="fixes">{% for f in rep.fixes %}<li class="text-success">✔ {{ f }}</li>{% else %}<li class="text-muted">Ništa nije trebalo popravljati.</li>{% endfor %}</ul>
+    </div>
+    {% if job.warnings %}
+    <div class="alert alert-warning small" role="alert">
+      <strong>Upozorenja</strong>
+      <ul class="mb-0">{% for w in job.warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+    {% if job.bitmap_view and job.status != 'approved' %}
+    <form class="card card-body mb-3" method="post" action="/upload/retrace" id="retrace-form">
+      <h2 class="h6">Podesi i ponovo obradi</h2>
+      <p class="small text-muted">Isti izvorni fajl, nove postavke – nema ponovnog uploada. Rezultat je novi pregled u istoriji.</p>
+      <input type="hidden" name="job_id" value="{{ job.job_id }}">
+      <input type="hidden" name="materijal" value="{{ job.params.materijal }}">
+      {% set rv = retrace_values or job.conversion.trace_raw or {} %}
+      {% if job.conversion.format == 'image' %}
+      <div class="mb-2">
+        <label class="form-label small mb-1" for="sirina_mm-rt">Širina na materijalu (mm) <span class="text-danger">*</span></label>
+        <input class="form-control form-control-sm" type="number" id="sirina_mm-rt" name="sirina_mm" step="any"
+               min="{{ C.IMAGE_WIDTH_MIN_MM }}" max="{{ C.LASER_WORK_AREA_MM[0] }}"
+               value="{{ (retrace_values or {}).get('sirina_mm') or job.conversion.width_mm or '' }}">
+      </div>
+      {% endif %}
+      {% set values = rv %}{% set sfx = '-rt' %}{% include "partials/trace_fields.html" %}
+      <button type="submit" class="btn btn-primary mt-2">Ponovo obradi</button>
+    </form>
+    {% endif %}
+  </div>
+  <div class="col-lg-6">
+    <table class="table table-sm small">
+      {% for layer in ['CUT', 'ENGRAVE', 'SCORE'] %}
+      <tr><th>{{ layer }}</th><td>kontura {{ job.summary.layers[layer].rings }}, dužina {{ '%.1f'|format(job.summary.layers[layer].length_mm) }} mm</td></tr>
+      {% endfor %}
+      <tr><th>Elemenata / tekstova</th><td>{{ rep.stats.elementi }} / {{ rep.stats.tekst }}</td></tr>
+    </table>
+    {% if job.status == 'approved' %}
+    <div class="alert alert-success" role="alert" id="odobreno">
+      <strong>Odobreno i poslano u produkciju.</strong><br>
+      <span class="small">Folder: <code>{{ job.production_dir }}</code></span>
+    </div>
+    {% else %}
+    <div class="d-flex flex-wrap gap-2">
+      <form method="post" action="/upload/approve">
+        <input type="hidden" name="job_id" value="{{ job.job_id }}">
+        <button type="submit" class="btn btn-success btn-lg" id="btn-approve" {% if job.blocking %}disabled{% endif %}>Odobri i pošalji u produkciju</button>
+      </form>
+      <a class="btn btn-outline-primary btn-lg" href="/upload">Uploaduj drugi fajl</a>
+    </div>
+    {% endif %}
+    {% if not job.blocking %}
+    <div class="d-flex flex-wrap gap-2 mt-2">
+      <a class="btn btn-outline-danger" href="/machine?job={{ job.job_id }}" id="btn-machine">🔴 Pošalji na laser</a>
+      <a class="btn btn-outline-secondary" href="/editor/{{ job.job_id }}" id="btn-editor">Otvori u editoru</a>
+    </div>
+    {% endif %}
+    <p class="small mt-2">Fajlovi:
+      {% for f in job.sources %}<a href="/jobs/{{ job.job_id }}/{{ f }}">{{ f }}</a>{% if not loop.last %} · {% endif %}{% endfor %}
+      {% for f in job.outputs %} · <a href="/jobs/{{ job.job_id }}/{{ f }}">{{ f }}</a>{% endfor %}
+    </p>
+  </div>
+</div>
+{% endblock %}
