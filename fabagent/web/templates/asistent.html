@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Asistent{% endblock %}
+{% block content %}
+<h1 class="h4 mb-1">Asistent</h1>
+<p class="text-muted small">Napiši nalog svojim riječima i priloži fajl. Asistent pročita šta
+može, a za ostalo pita. Ništa se ne pogađa i ništa ne ide na mašinu dok ti ne pokreneš.</p>
+
+{% include "partials/error_banner.html" %}
+
+{% if not nalog %}
+<form method="post" action="/asistent" enctype="multipart/form-data" class="mt-3" style="max-width:48rem">
+  <div class="mb-3">
+    <label class="form-label" for="tekst">Nalog <span class="text-danger">*</span></label>
+    <textarea class="form-control" id="tekst" name="tekst" rows="3"
+      placeholder="npr. graviraj moju sliku 120 x 160 mm na šperploču, bez pozadine, sivi tonovi">{{ tekst|default('') }}</textarea>
+  </div>
+  <div class="mb-3">
+    <label class="form-label" for="fajl">Fajl</label>
+    <input class="form-control" type="file" id="fajl" name="fajl" accept="{{ accept }}">
+  </div>
+  <button class="btn btn-primary btn-lg" type="submit">Pročitaj nalog</button>
+</form>
+{% else %}
+
+<div class="row g-3 mt-1">
+  <div class="col-lg-5">
+    <div class="card"><div class="card-body">
+      <h2 class="h6">Pročitano iz naloga</h2>
+      {% if nalog.procitano %}
+      <table class="table table-sm mb-0">
+        <tbody>
+        {% for polje, podatak in nalog.procitano.items() %}
+          <tr><th class="fw-normal small text-muted">{{ polje }}</th>
+              <td>{{ podatak.vrijednost }}<div class="small text-muted">{{ podatak.iz }}</div></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="small text-muted mb-0">Iz naloga se nije moglo pročitati ništa. Odgovori na pitanja desno.</p>
+      {% endif %}
+      <p class="small text-muted mt-2 mb-0">Fajl: <code>{{ fajl_ime or 'nije priložen' }}</code></p>
+    </div></div>
+
+    {% if primjedbe %}
+    <div class="alert alert-warning mt-3" role="alert">
+      <strong>Korekcije</strong>
+      <ul class="mb-0 small">{% for m in primjedbe %}<li>{{ m }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-7">
+    <form method="post" action="/asistent/napravi" class="card"><div class="card-body">
+      <input type="hidden" name="token" value="{{ token }}">
+      <input type="hidden" name="tekst" value="{{ nalog.tekst }}">
+      <h2 class="h6">{% if pitanja %}Treba još ovo{% else %}Sve je tu{% endif %}</h2>
+
+      {% for p in pitanja %}
+      <div class="mb-3">
+        <label class="form-label small" for="{{ p.polje }}">{{ p.pitanje }}</label>
+        {% if p.izbor %}
+        <select class="form-select" id="{{ p.polje }}" name="{{ p.polje }}">
+          <option value="">— izaberi —</option>
+          {% for i in p.izbor %}<option value="{{ i.vrijednost }}">{{ i.oznaka }}</option>{% endfor %}
+        </select>
+        {% else %}
+        <input class="form-control" type="number" step="any" id="{{ p.polje }}" name="{{ p.polje }}"
+               {% if p.min is defined %}min="{{ p.min }}"{% endif %}
+               {% if p.max is defined %}max="{{ p.max }}"{% endif %}>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+      {% if nalog.ukloni_pozadinu and slika_url %}
+      <input type="hidden" name="pregled_url" value="{{ slika_url }}">
+      {% include "partials/okvir_fields.html" %}
+      {% endif %}
+
+      <button class="btn btn-success btn-lg" type="submit">Napravi posao</button>
+      <a class="btn btn-link" href="/asistent">Novi nalog</a>
+    </div></form>
+  </div>
+</div>
+<script src="/static/okvir.js?v={{ asset_v }}"></script>
+{% endif %}
+{% endblock %}

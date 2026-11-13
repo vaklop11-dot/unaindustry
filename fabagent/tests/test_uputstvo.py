@@ -74,6 +74,16 @@ def test_koraci_idu_redom_i_prazan_hod_je_prije_rada():
     assert naslovi[0] == "Materijal"
 
 
+def test_nadzor_se_ne_trazi_stajanjem():
+    """Operater ne mora stajati uz masinu - nadzor ide preko kamere i Stop dugmeta."""
+    koraci = U.build(POSAO)["koraci"]
+    tekst = " ".join(k["tekst"] for k in koraci).lower()
+    assert "stoj uz" not in tekst and "stajanje uz masinu" in tekst
+    assert "kamera" in tekst and "/machine" in tekst
+    naslovi = [k["naslov"] for k in koraci]
+    assert naslovi.index("Prije pokretanja - nadzor sa mjesta") < naslovi.index("Rad")
+
+
 def test_tekstualna_verzija_sadrzi_sve_dijelove():
     t = U.kao_tekst(U.build(POSAO))
     for dio in ("POSTAVKE MASINE", "KORACI", "UPOZORENJA", "6000 mm/min", "Frame"):

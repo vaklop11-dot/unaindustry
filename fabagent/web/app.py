@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import secrets
 import base64
 import hashlib
 from pathlib import Path
@@ -290,6 +291,98 @@ def create_app(data_dir: str | None = None, camera_source: str | None = None) ->
         spec_or_404(job["type"], job["template"])
         return page(request, "history_detail.html", dict(preview_ctx(job),
                     reopen=f"/{job['type']}/{job['template']}?job={job_id}"))
+
+    # ---------------------------------------------------------- asistent
+    def _pending_dir():
+        d = store.jobs_dir.parent / "pending"
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+
+    def asistent_page(request, nalog=None, token="", fajl_ime="", banner=None, status=200,
+                      values=None):
+        from fabagent.core import asistent as A
+        from fabagent.core.converter import SUPPORTED_EXT
+        ctx = {"nalog": nalog, "token": token, "fajl_ime": fajl_ime, "banner": banner,
+               "accept": ",".join(SUPPORTED_EXT), "pitanja": [], "primjedbe": [],
+               "slika_url": "", "values": values or {}}
+        if nalog is not None:
+            ctx["pitanja"] = A.pitanja(nalog)
+            ctx["primjedbe"] = A.primjedbe(nalog)
+            if token and fajl_ime:
+                ctx["slika_url"] = f"/asistent/fajl/{token}"
+        return page(request, "asistent.html", ctx, status)
+
+    @app.get("/asistent", response_class=HTMLResponse)
+    def asistent_form(request: Request):
+        return asistent_page(request)
+
+    @app.post("/asistent", response_class=HTMLResponse)
+    async def asistent_citaj(request: Request):
+        from fabagent.core import asistent as A
+        form = await request.form()
+        tekst = str(form.get("tekst") or "").strip()
+        if not tekst:
+            return asistent_page(request, banner=error_view(MissingParam("asistent", ["tekst"]))[0],
+                                 status=HTTP_UNPROCESSABLE)
+        token, ime = "", ""
+        f = form.get("fajl")
+        if f is not None and getattr(f, "filename", ""):
+            data = await f.read(C.UPLOAD_MAX_BYTES + 1)
+            token = secrets.token_hex(8)
+            ime = Path(f.filename).name
+            folder = _pending_dir() / token
+            folder.mkdir(parents=True)
+            (folder / ime).write_bytes(data)
+        return asistent_page(request, A.procitaj(tekst), token, ime)
+
+    @app.get("/asistent/fajl/{token}")
+    def asistent_fajl(token: str):
+        folder = _pending_dir() / token
+        fajlovi = sorted(folder.glob("*")) if folder.is_dir() else []
+        if not fajlovi:
+            raise OutputError(f"privremeni fajl '{token}' ne postoji")
+        return FileResponse(fajlovi[0])
+
+    @app.post("/asistent/napravi", response_class=HTMLResponse)
+    async def asistent_napravi(request: Request):
+        from fabagent.core import asistent as A
+        form = await request.form()
+        tekst = str(form.get("tekst") or "")
+        token = str(form.get("token") or "")
+        nalog = A.procitaj(tekst)
+
+        # Odgovori na pitanja popunjavaju samo ono sto iz naloga nije procitano.
+        for p in A.pitanja(nalog):
+            odgovor = str(form.get(p["polje"]) or "").strip()
+            if odgovor:
+                setattr(nalog, p["polje"],
+                        float(odgovor) if p.get("jedinica") or p.get("min") is not None
+                        else odgovor)
+
+        preostalo = [p["polje"] for p in A.pitanja(nalog)]
+        folder = _pending_dir() / token if token else None
+        fajlovi = sorted(folder.glob("*")) if folder and folder.is_dir() else []
+        ime = fajlovi[0].name if fajlovi else ""
+
+        if preostalo:
+            return asistent_page(request, nalog, token, ime,
+                                 banner=error_view(MissingParam("asistent", preostalo))[0],
+                                 status=HTTP_UNPROCESSABLE)
+        if not fajlovi:
+            return asistent_page(request, nalog, token, ime,
+                                 banner=error_view(MissingParam("asistent", ["fajl"]))[0],
+                                 status=HTTP_UNPROCESSABLE)
+
+        values = {k: str(form.get(k) or "").strip() for k in UPLOAD_VALUE_FIELDS}
+        values.update(A.u_parametre(nalog))
+        materijal = values.pop("materijal", "") or nalog.materijal or ""
+        try:
+            job = _process_upload(ime, fajlovi[0].read_bytes(), materijal, values)
+        except FabError as exc:
+            return asistent_page(request, nalog, token, ime,
+                                 banner=error_view(exc)[0], status=HTTP_UNPROCESSABLE)
+        from fabagent.web.api import result_template
+        return page(request, result_template(job), preview_ctx(job))
 
     # ------------------------------------------------------- radni nalog
     @app.get("/jobs/{job_id}/uputstvo", response_class=HTMLResponse)

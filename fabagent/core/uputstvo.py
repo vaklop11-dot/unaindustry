@@ -137,9 +137,16 @@ def build(job: dict) -> dict:
          "tekst": "Prvo Home, pa Frame. Frame vozi okvir posla sa ugasenim laserom (S0/M5). "
                   "Gledaj da glava ne izadje van ploce i da ne udari u stezaljku. "
                   "Ako okvir ne lezi gdje treba, pomjeri materijal, ne fajl."},
+        {"naslov": "Prije pokretanja - nadzor sa mjesta",
+         "tekst": "Nadzor ne znaci stajanje uz masinu. Prije starta namjesti tako da sve "
+                  "mozes iz stolice: kamera uperena u sto i otvorena u pregledu, stranica "
+                  "/machine otvorena jer su Pause i Stop na njoj, aparat za gasenje nadohvat "
+                  "ruke. Sto ocisti od otpadaka i ostataka materijala - oni se pale, a ne komad "
+                  "koji gravira."},
         {"naslov": "Rad",
-         "tekst": "Tek kad je okvir tacan, pokreni. Ne ostavljaj masinu bez nadzora. "
-                  "Pri prvom komadu stoj uz prekidac."},
+         "tekst": "Tek kad je okvir tacan, pokreni. Ukljuci odvod dima i air assist ako ga imas. "
+                  "Ostani u prostoriji i gledaj kameru; Stop na stranici /machine gasi laser "
+                  "(soft-reset). Ne izlazi dok masina radi, bez obzira na procijenjeno trajanje."},
         {"naslov": "Provjera",
          "tekst": "Nakon zavrsetka provjeri ton i dubinu. Ako je presvijetlo smanji brzinu ili "
                   "podigni snagu; ako je pregorjelo obrnuto. Izmjerenu vrijednost upisi u preset "
