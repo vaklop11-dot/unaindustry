@@ -14,6 +14,7 @@
     <button type="submit" class="btn btn-success btn-lg" id="btn-approve" {% if job.blocking %}disabled{% endif %}>Odobri i pošalji u produkciju</button>
   </form>
   {% endif %}
+  <a class="btn btn-outline-dark btn-lg" href="/jobs/{{ job.job_id }}/uputstvo" id="btn-uputstvo">Radni nalog</a>
   {% if job.type in ('laser', 'upload', 'raster') and not job.blocking %}
   <a class="btn btn-outline-danger btn-lg" href="/machine?job={{ job.job_id }}" id="btn-machine">🔴 Pošalji na laser</a>
   {% endif %}

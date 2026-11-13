@@ -291,6 +291,18 @@ def create_app(data_dir: str | None = None, camera_source: str | None = None) ->
         return page(request, "history_detail.html", dict(preview_ctx(job),
                     reopen=f"/{job['type']}/{job['template']}?job={job_id}"))
 
+    # ------------------------------------------------------- radni nalog
+    @app.get("/jobs/{job_id}/uputstvo", response_class=HTMLResponse)
+    def job_uputstvo(request: Request, job_id: str):
+        from fabagent.core import uputstvo as U
+        return page(request, "uputstvo.html", {"nalog": U.build(store.get(job_id))})
+
+    @app.get("/jobs/{job_id}/uputstvo.txt", response_class=Response)
+    def job_uputstvo_txt(job_id: str):
+        from fabagent.core import uputstvo as U
+        tekst = U.kao_tekst(U.build(store.get(job_id)))
+        return Response(tekst, media_type="text/plain; charset=utf-8")
+
     @app.get("/jobs/{job_id}/{name}")
     def job_file(job_id: str, name: str):
         path = store.file_path(job_id, name)
