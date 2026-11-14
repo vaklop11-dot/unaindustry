@@ -24,6 +24,7 @@ Tok:
 from __future__ import annotations
 
 import math
+import re
 import unicodedata
 from dataclasses import dataclass, field
 
@@ -63,6 +64,15 @@ MASINA_POLJA = (
 SLOJ_IME = {"CUT": "rezanje", "ENGRAVE": "graviranje", "SCORE": "zarezivanje"}
 PRESET_POLJE = {"brzina_mm_s": "speed_mm_s", "snaga_posto": "power_pct", "prolaza": "passes"}
 
+# Rijeci po kojima se iz jednog odgovora cita koji je parametar zadan:
+# "brzina 85 snaga 40" postavi oba odjednom, ostalo ide iz preseta.
+MASINA_RIJECI = {"brzina_mm_s": ("brzin",), "snaga_posto": ("snag",),
+                 "prolaza": ("prolaz", "pass")}
+
+# Vektorski fajl nema piksele, pa rasterska pitanja za njega nemaju smisla.
+VEKTORSKI_EXT = (".svg", ".dxf", ".pdf")
+RASTERSKA_PITANJA = ("rezim_slike", "interval_mm")
+
 
 def _bez_kvaka(text: str) -> str:
     razlozeno = unicodedata.normalize("NFKD", (text or "").lower())
@@ -99,6 +109,7 @@ class Stanje:
     masina: dict = field(default_factory=dict)     # "SLOJ.polje" -> {"vrijednost", "iz"}
     faza: str = "nalog"
     cekam: str = ""                                 # polje pitanja na koje se ceka odgovor
+    fajl: str = ""                                  # ime prilozenog fajla
     dnevnik: list = field(default_factory=list)     # [{"ko": ..., "tekst": ...}]
 
     def kaze(self, ko: str, tekst: str) -> None:
@@ -108,7 +119,7 @@ class Stanje:
     def kao_dict(self) -> dict:
         return {"tekst_naloga": self.tekst_naloga, "odgovori": self.odgovori,
                 "masina": self.masina, "faza": self.faza, "cekam": self.cekam,
-                "dnevnik": self.dnevnik}
+                "fajl": self.fajl, "dnevnik": self.dnevnik}
 
 
 def iz_dicta(data: dict | None) -> Stanje:
@@ -119,8 +130,23 @@ def iz_dicta(data: dict | None) -> Stanje:
         masina=dict(d.get("masina") or {}),
         faza=str(d.get("faza") or "nalog"),
         cekam=str(d.get("cekam") or ""),
+        fajl=str(d.get("fajl") or ""),
         dnevnik=list(d.get("dnevnik") or []),
     )
+
+
+def je_vektor(stanje: Stanje) -> bool:
+    """Je li prilozeni fajl vektorski. Prazno ime = jos se ne zna."""
+    return stanje.fajl.lower().endswith(VEKTORSKI_EXT)
+
+
+def nepotrebna_pitanja(stanje: Stanje) -> tuple[str, ...]:
+    """Pitanja koja za ovaj fajl nemaju smisla, pa se ne postavljaju.
+
+    Vektorski fajl (SVG, DXF, PDF) nema piksele: 'kako se gravira' i 'razmak
+    linija' su rasterska pitanja i na njih nema sta da se odgovori.
+    """
+    return RASTERSKA_PITANJA if je_vektor(stanje) else ()
 
 
 def novo() -> Stanje:
@@ -428,26 +454,62 @@ def je_prihvatanje(unos: str) -> bool:
 
 
 # -------------------------------------------------------------------- pitanja
+def _procitaj_postavke(unos: str) -> dict:
+    """{'brzina_mm_s': 85.0, ...} iz 'brzina 85 snaga 40'. Prazno ako nista nije imenovano."""
+    t = _bez_kvaka(unos).replace(",", ".")
+    nadjeno: dict[str, float] = {}
+    for polje, rijeci in MASINA_RIJECI.items():
+        for rijec in rijeci:
+            m = re.search(rf"{rijec}\w*\s*[:=]?\s*(\d+(?:\.\d+)?)", t)
+            if m:
+                nadjeno[polje] = float(m.group(1))
+                break
+    return nadjeno
+
+
+def _postavke_preseta(n: A.Nalog, sloj: str) -> dict:
+    return {polje: _preset_vrijednost(n, sloj, polje) for polje, _, _ in MASINA_POLJA}
+
+
 def _pitanje_masine(n: A.Nalog, stanje: Stanje) -> dict | None:
-    """Prvi parametar masine koji nije dogovoren."""
+    """Jedno pitanje po sloju za sve tri postavke odjednom.
+
+    Tri odvojena pitanja su za operatera tri prekida umjesto jednog; preset ionako
+    nosi sve tri, pa se nude zajedno i jednim 'da' se uzimaju sve.
+    """
     for sloj in slojevi(n):
-        for polje, ime, jedinica in MASINA_POLJA:
-            kljuc = f"{sloj}.{polje}"
-            if kljuc in stanje.masina:
+        fale = [polje for polje, _, _ in MASINA_POLJA if f"{sloj}.{polje}" not in stanje.masina]
+        if not fale:
+            continue
+        iz_preseta = _postavke_preseta(n, sloj)
+        p = _preset(n)
+        provjereno = bool(p.verified) if p else False
+        imena = {polje: (ime, jed) for polje, ime, jed in MASINA_POLJA}
+
+        ponuda = []
+        for polje in fale:
+            vrijednost = iz_preseta.get(polje)
+            ime, jed = imena[polje]
+            if vrijednost is None:
                 continue
-            iz_preseta = _preset_vrijednost(n, sloj, polje)
-            p = _preset(n)
-            provjereno = bool(p.verified) if p else False
-            if iz_preseta is None:
-                pitanje = (f"{ime} za {SLOJ_IME[sloj]} - preset za ovaj materijal je nema. "
-                           f"Upisi vrijednost{(' u ' + jedinica) if jedinica else ''}.")
+            if polje == "brzina_mm_s":
+                ponuda.append(f"brzina {_g(vrijednost)} mm/s ({_g(float(vrijednost) * 60)} mm/min)")
+            elif polje == "prolaza":
+                ponuda.append(f"{int(vrijednost)} prolaz(a)")
             else:
-                oznaka = "" if provjereno else " (nije mjereno na tvojoj masini)"
-                pitanje = (f"{ime} za {SLOJ_IME[sloj]}: preset kaze "
-                           f"{_g(iz_preseta)}{(' ' + jedinica) if jedinica else ''}"
-                           f"{oznaka}. Napisi 'da' da to uzmemo, ili upisi svoj broj.")
-            return {"polje": kljuc, "pitanje": pitanje, "jedinica": jedinica,
-                    "preset": iz_preseta, "provjereno": provjereno, "sloj": sloj}
+                ponuda.append(f"snaga {_g(vrijednost)} {jed}".strip())
+
+        if ponuda:
+            oznaka = "" if provjereno else " Nije mjereno na tvojoj masini."
+            pitanje = (f"Postavke za {SLOJ_IME[sloj]}. Preset nudi: {', '.join(ponuda)}."
+                       f"{oznaka} Napisi 'da' da uzmemo sve, ili npr. 'brzina 85 snaga 40' "
+                       f"da promijenis sto hoces - ostalo ide iz preseta.")
+        else:
+            trazeno = ", ".join(imena[polje][0].lower() for polje in fale)
+            pitanje = (f"Postavke za {SLOJ_IME[sloj]} - preset za ovaj materijal ih nema. "
+                       f"Upisi: {trazeno}, npr. 'brzina 85 snaga 40 prolaza 1'.")
+        return {"polje": f"{sloj}.postavke", "pitanje": pitanje, "jedinica": "",
+                "preset": iz_preseta, "provjereno": provjereno, "sloj": sloj, "fale": fale}
     return None
 
 
@@ -491,34 +553,26 @@ def tekst_pitanja(pitanje: dict | None) -> str:
     return tekst
 
 
+def pitanja_naloga(stanje: Stanje) -> list[dict]:
+    """Pitanja o nalogu, bez onih koja za prilozeni fajl nemaju smisla."""
+    preskoci = nepotrebna_pitanja(stanje)
+    return [p for p in A.pitanja(nalog(stanje)) if p["polje"] not in preskoci]
+
+
 def sljedece_pitanje(stanje: Stanje) -> dict | None:
     """Pitanje na koje se ceka odgovor, po trenutnoj fazi. None kad nema vise."""
-    n = nalog(stanje)
-    preostalo = A.pitanja(n)
+    preostalo = pitanja_naloga(stanje)
     if preostalo:
         return preostalo[0]
-    return _pitanje_masine(n, stanje)
+    return _pitanje_masine(nalog(stanje), stanje)
 
 
 def _primi_odgovor(stanje: Stanje, pitanje: dict, unos: str) -> str:
     """Upise odgovor u stanje. Vrati potvrdu, ili objasnjenje zasto nije prihvaceno."""
     polje = pitanje["polje"]
 
-    if "." in polje:                                   # parametar masine
-        if je_prihvatanje(unos):
-            if pitanje.get("preset") is None:
-                return ("Preset za ovo nema vrijednost, pa nemam sta da prihvatim. "
-                        "Upisi broj.")
-            stanje.masina[polje] = {"vrijednost": pitanje["preset"], "iz": "preset"}
-            return f"Uzeto iz preseta: {_g(pitanje['preset'])} {pitanje['jedinica']}".strip()
-        broj = _broj(unos)
-        if broj is None:
-            return "Treba mi broj, ili 'da' da uzmemo vrijednost iz preseta."
-        greska = _van_opsega(polje, broj)
-        if greska:
-            return greska
-        stanje.masina[polje] = {"vrijednost": broj, "iz": "operater"}
-        return f"Upisano: {_g(broj)} {pitanje['jedinica']}".strip()
+    if polje.endswith(".postavke"):                    # sve postavke jednog sloja
+        return _primi_postavke(stanje, pitanje, unos)
 
     if pitanje.get("izbor"):                           # izbor iz liste
         t = _bez_kvaka(unos).strip()
@@ -541,6 +595,41 @@ def _primi_odgovor(stanje: Stanje, pitanje: dict, unos: str) -> str:
     return f"Upisano: {_g(broj)} {pitanje.get('jedinica', '')}".strip()
 
 
+def _primi_postavke(stanje: Stanje, pitanje: dict, unos: str) -> str:
+    """Jedan odgovor postavi sve tri postavke sloja: imenovano od operatera, ostalo iz preseta."""
+    sloj = pitanje["sloj"]
+    fale = list(pitanje["fale"])
+    iz_preseta = pitanje["preset"] or {}
+    zadano = _procitaj_postavke(unos)
+
+    if not zadano and not je_prihvatanje(unos):
+        return ("Treba mi 'da' da uzmemo preset, ili imenovano: "
+                "npr. 'brzina 85', 'snaga 40', 'prolaza 2'. Mogu i sve odjednom.")
+
+    for polje, broj in zadano.items():                 # prvo provjeri sve, pa upisi
+        greska = _van_opsega(f"{sloj}.{polje}", broj)
+        if greska:
+            ime = next(i for p, i, _ in MASINA_POLJA if p == polje)
+            return f"{ime}: {greska}"
+
+    bez_preseta = [p for p in fale if p not in zadano and iz_preseta.get(p) is None]
+    if bez_preseta:
+        trazeno = ", ".join(next(i for p, i, _ in MASINA_POLJA if p == q).lower()
+                            for q in bez_preseta)
+        return (f"Preset nema: {trazeno}. Upisi i to, npr. "
+                f"'{' '.join(q.split('_')[0] + ' 0' for q in bez_preseta)}'.")
+
+    upisano = []
+    for polje in fale:
+        if polje in zadano:
+            stanje.masina[f"{sloj}.{polje}"] = {"vrijednost": zadano[polje], "iz": "operater"}
+            upisano.append(f"{polje.split('_')[0]} {_g(zadano[polje])} (tvoje)")
+        else:
+            stanje.masina[f"{sloj}.{polje}"] = {"vrijednost": iz_preseta[polje], "iz": "preset"}
+            upisano.append(f"{polje.split('_')[0]} {_g(iz_preseta[polje])} (preset)")
+    return f"Upisano za {SLOJ_IME[sloj]}: " + ", ".join(upisano) + "."
+
+
 def _van_opsega(kljuc: str, broj: float) -> str | None:
     polje = kljuc.split(".", 1)[1]
     opsezi = {"brzina_mm_s": (C.LAYER_SPEED_RANGE_MM_S, "mm/s"),
@@ -560,7 +649,7 @@ def _van_opsega(kljuc: str, broj: float) -> str | None:
 def _faza_dalje(stanje: Stanje) -> None:
     """Postavi fazu po tome sta je jos otvoreno."""
     n = nalog(stanje)
-    if A.pitanja(n):
+    if pitanja_naloga(stanje):
         stanje.faza = "nalog"
     elif _pitanje_masine(n, stanje) is not None:
         stanje.faza = "masina"

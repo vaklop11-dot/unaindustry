@@ -56,7 +56,7 @@
 
   <div class="col-xxl-7 col-xl-6" id="pregled">
     {% if banner %}
-      {% include "partials/error_banner.html" %}
+      {% if banner %}{% include "partials/error_banner.html" %}{% endif %}
     {% endif %}
     {% if job %}
       {% if kind == 'laser' %}{% include "partials/preview_laser.html" %}{% else %}{% include "partials/preview_3d.html" %}{% endif %}

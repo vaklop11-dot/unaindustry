@@ -60,30 +60,52 @@ def test_odgovor_na_broj_se_upise():
     assert R.nalog(s).interval_mm == 0.12
 
 
-def test_da_prihvata_vrijednost_iz_preseta():
+def test_da_prihvata_sve_postavke_iz_preseta():
+    """Jedno 'da' postavi sve tri - tri odvojena pitanja su tri prekida umjesto jednog."""
     s = R.korak(R.novo(), "graviraj sliku 100 x 100 mm na sperplocu, sivi tonovi")
     s = R.korak(s, "0.15")
     assert s.faza == "masina"
-    assert s.cekam == "ENGRAVE.brzina_mm_s"
+    assert s.cekam == "ENGRAVE.postavke"
     s = R.korak(s, "da")
-    zapis = s.masina["ENGRAVE.brzina_mm_s"]
-    assert zapis["iz"] == "preset"
-    assert zapis["vrijednost"] == pytest.approx(100.0)   # sperploca_3mm engrave
+    for polje, ocekivano in (("brzina_mm_s", 100.0), ("snaga_posto", 30.0), ("prolaza", 1)):
+        zapis = s.masina[f"ENGRAVE.{polje}"]
+        assert zapis["iz"] == "preset"
+        assert zapis["vrijednost"] == pytest.approx(ocekivano)
+    assert R.sljedece_pitanje(s) is None
 
 
-def test_svoj_broj_pise_operatera_kao_izvor():
+def test_imenovana_vrijednost_je_operaterova_ostalo_iz_preseta():
     s = R.korak(R.novo(), "graviraj sliku 100 x 100 mm na sperplocu, sivi tonovi")
-    s = R.korak(R.korak(s, "0.15"), "85")
+    s = R.korak(R.korak(s, "0.15"), "brzina 85")
     assert s.masina["ENGRAVE.brzina_mm_s"] == {"vrijednost": 85.0, "iz": "operater"}
+    assert s.masina["ENGRAVE.snaga_posto"]["iz"] == "preset"
+    assert R.sljedece_pitanje(s) is None
+
+
+def test_vise_imenovanih_vrijednosti_odjednom():
+    s = R.korak(R.novo(), "graviraj sliku 100 x 100 mm na sperplocu, sivi tonovi")
+    s = R.korak(R.korak(s, "0.15"), "brzina 85 snaga 40 prolaza 2")
+    assert s.masina["ENGRAVE.brzina_mm_s"]["vrijednost"] == 85.0
+    assert s.masina["ENGRAVE.snaga_posto"]["vrijednost"] == 40.0
+    assert s.masina["ENGRAVE.prolaza"]["vrijednost"] == 2.0
+    assert all(z["iz"] == "operater" for z in s.masina.values())
+
+
+def test_goli_broj_bez_imena_se_ne_prihvata():
+    """'85' ne kaze je li brzina ili snaga - ne pogadja se."""
+    s = R.korak(R.novo(), "graviraj sliku 100 x 100 mm na sperplocu, sivi tonovi")
+    s2 = R.korak(R.korak(s, "0.15"), "85")
+    assert "ENGRAVE.brzina_mm_s" not in s2.masina
+    assert "imenovano" in [d["tekst"] for d in s2.dnevnik if d["ko"] == "asistent"][-2]
 
 
 def test_van_opsega_se_ne_upise():
     s = R.korak(R.novo(), "graviraj sliku 100 x 100 mm na sperplocu, sivi tonovi")
     s = R.korak(s, "0.15")
     previse = C.LAYER_SPEED_RANGE_MM_S[1] + 1
-    s2 = R.korak(s, str(previse))
-    assert "ENGRAVE.brzina_mm_s" not in s2.masina
-    assert s2.cekam == "ENGRAVE.brzina_mm_s"
+    s2 = R.korak(s, f"brzina {previse:g}")
+    assert s2.masina == {}                       # nijedna se ne upise ako je jedna losa
+    assert s2.cekam == "ENGRAVE.postavke"
     assert any("opsega" in d["tekst"] for d in s2.dnevnik if d["ko"] == "asistent")
 
 
@@ -103,7 +125,7 @@ def test_neprepoznat_izbor_ne_upise_nista():
 
 def test_cijeli_tok_dolazi_do_gotovo():
     s = R.korak(R.novo(), "graviraj sliku 100 x 100 mm na sperplocu, sivi tonovi")
-    for unos in ("0.15", "da", "da", "da"):
+    for unos in ("0.15", "da"):
         s = R.korak(s, unos)
     assert s.faza == "gotovo"
     assert s.cekam == ""
@@ -248,11 +270,12 @@ def test_korak_ne_mijenja_ulazno_stanje():
 
 def test_parametri_masine_pokazuju_izvor():
     s = R.korak(R.novo(), "graviraj sliku 100 x 100 mm na sperplocu, sivi tonovi")
-    s = R.korak(R.korak(s, "0.15"), "85")
+    s = R.korak(R.korak(s, "0.15"), "brzina 85")
     redovi = R.parametri_masine(s)
     assert redovi[0]["parametar"] == "Brzina"
     assert redovi[0]["iz"] == "operater"
     assert "mm/min" in redovi[0]["vrijednost"]
+    assert [r["iz"] for r in redovi] == ["operater", "preset", "preset"]
 
 
 def test_slojevi_po_vrsti_posla():
@@ -310,7 +333,7 @@ def test_odbijeni_izbor_kaze_sta_je_dozvoljeno():
 def test_tok_bez_rezima_u_nalogu_dolazi_do_gotovo():
     """Nalog bez 'sivi tonovi': mora se moci odgovoriti na pitanje o rezimu."""
     s = R.korak(R.novo(), "graviraj moju sliku 120 x 160 mm na sperplocu")
-    for unos in ("grayscale", "0.15", "da", "da", "da"):
+    for unos in ("grayscale", "0.15", "da"):
         s = R.korak(s, unos)
     assert s.faza == "gotovo", [d["tekst"] for d in s.dnevnik][-3:]
     assert R.provjera_prije_starta(s)[0] == []
@@ -358,3 +381,40 @@ def test_odgovor_treba_mi_se_upise_a_ne_ponovi_pitanje():
     s2 = R.korak(s, "treba mi 0.15")
     assert s2.odgovori["interval_mm"] == 0.15
     assert s2.cekam != "interval_mm"
+
+
+# ---------------- vektorski fajl nema piksele: ne pitaj rasterska pitanja ------
+def _sa_fajlom(ime, tekst="graviraj ovo 120 x 160 mm na sperplocu"):
+    s = R.novo()
+    s.fajl = ime
+    return R.korak(s, tekst)
+
+
+@pytest.mark.parametrize("ime", ["gradina.svg", "crtez.dxf", "plan.pdf", "GRADINA.SVG"])
+def test_vektorski_fajl_ne_pita_za_rezim_i_razmak(ime):
+    s = _sa_fajlom(ime)
+    assert R.je_vektor(s) is True
+    polja = [p["polje"] for p in R.pitanja_naloga(s)]
+    assert "rezim_slike" not in polja
+    assert "interval_mm" not in polja
+
+
+@pytest.mark.parametrize("ime", ["slika.png", "foto.jpg", "foto.jpeg"])
+def test_rasterski_fajl_i_dalje_pita(ime):
+    s = _sa_fajlom(ime)
+    assert R.je_vektor(s) is False
+    polja = [p["polje"] for p in R.pitanja_naloga(s)]
+    assert "rezim_slike" in polja
+
+
+def test_svg_dolazi_do_gotovo_bez_rasterskih_pitanja():
+    s = _sa_fajlom("gradina.svg")
+    assert s.cekam == "ENGRAVE.postavke", [p["polje"] for p in R.pitanja_naloga(s)]
+    s = R.korak(s, "da")
+    assert s.faza == "gotovo"
+    assert R.provjera_prije_starta(s)[0] == []
+
+
+def test_fajl_prezivi_serijalizaciju():
+    s = _sa_fajlom("gradina.svg")
+    assert R.iz_dicta(s.kao_dict()).fajl == "gradina.svg"

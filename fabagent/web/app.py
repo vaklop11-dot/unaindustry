@@ -429,9 +429,10 @@ def create_app(data_dir: str | None = None, camera_source: str | None = None) ->
         blokade, upozorenja = Rz.provjera_prije_starta(stanje)
         pitanje = Rz.sljedece_pitanje(stanje)
         ctx = {"stanje": stanje, "stanje_token": _razgovor_token(stanje),
-               "token": token, "fajl_ime": fajl_ime, "banner": banner,
+               "token": token, "fajl_ime": fajl_ime or stanje.fajl, "banner": banner,
                "accept": ",".join(SUPPORTED_EXT), "pitanje": pitanje,
                "pitanje_tekst": Rz.tekst_pitanja(pitanje),
+               "procitano": Rz.nalog(stanje).procitano,
                "parametri": Rz.parametri_masine(stanje), "blokade": blokade,
                "upozorenja": upozorenja, "teme": [n for n, _, _ in Rz.ZNANJE],
                "spremno": stanje.faza == "gotovo" and not blokade}
@@ -458,7 +459,14 @@ def create_app(data_dir: str | None = None, camera_source: str | None = None) ->
             folder = _pending_dir() / token
             folder.mkdir(parents=True, exist_ok=True)
             (folder / fajl_ime).write_bytes(data)
-            stanje.kaze("asistent", f"Fajl primljen: {fajl_ime}")
+            stanje.fajl = fajl_ime
+            poruka = f"Fajl primljen: {fajl_ime}"
+            if Rz.je_vektor(stanje):
+                poruka += (" - vektorski fajl, pa ne pitam kako se gravira ni za razmak "
+                           "linija; to su pitanja za sliku sa pikselima.")
+            stanje.kaze("asistent", poruka)
+        elif fajl_ime and not stanje.fajl:
+            stanje.fajl = fajl_ime
 
         unos = str(form.get("unos") or "").strip()
         if unos:

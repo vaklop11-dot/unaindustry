@@ -92,7 +92,7 @@ def test_parametri_se_prikazuju_sa_izvorom(klijent):
     t = posalji(klijent, s, NALOG).text
     t = posalji(klijent, stanje_iz(t), "0.15").text
     t = posalji(klijent, stanje_iz(t), "da").text
-    assert "Dogovoreni parametri" in t
+    assert "Postavke mašine" in t
     assert "mm/min" in t
     assert "preset" in t
 
@@ -124,7 +124,7 @@ def test_fajl_se_primi_i_zapamti(klijent):
 def test_bez_fajla_posao_se_ne_pravi(klijent):
     s = stanje_iz(klijent.get("/razgovor").text)
     t = posalji(klijent, s, NALOG).text
-    for unos in ("0.15", "da", "da", "da"):
+    for unos in ("0.15", "da"):
         t = posalji(klijent, stanje_iz(t), unos).text
     r = klijent.post("/razgovor/napravi", data={"stanje": stanje_iz(t)})
     assert r.status_code == 422
@@ -143,7 +143,7 @@ def test_cio_tok_pravi_posao(klijent):
     r = posalji(klijent, s, NALOG, files={"fajl": ("motiv.png", slika_bajtovi(), "image/png")})
     token = TOKEN_RE.search(r.text).group(1)
     t = r.text
-    for unos in ("0.15", "da", "da", "da"):
+    for unos in ("0.15", "da"):
         t = posalji(klijent, stanje_iz(t), unos, token=token, fajl_ime="motiv.png").text
     assert "Napravi posao" in t
     r = klijent.post("/razgovor/napravi",
