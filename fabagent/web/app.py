@@ -167,6 +167,28 @@ def _asset_version() -> str:
     return h.hexdigest()[:10]
 
 
+def _oznaka_koda() -> str:
+    """Vrijeme najnovije izmjene koda, kao 'dd.mm. HH:MM'.
+
+    Racuna se jednom, pri dizanju servera. Ako je kod izmijenjen a server nije
+    ponovo pokrenut, u navigaciji stoji staro vrijeme - odmah se vidi da proces
+    servira stari kod. Bez ovoga se nova stranica cini da ne postoji.
+    """
+    from datetime import datetime
+    korijen = WEB_DIR.parent
+    najnoviji = 0.0
+    for f in korijen.rglob("*"):
+        if f.suffix not in (".py", ".html", ".css", ".js") or "__pycache__" in f.parts:
+            continue
+        try:
+            najnoviji = max(najnoviji, f.stat().st_mtime)
+        except OSError:
+            continue
+    if not najnoviji:
+        return "nepoznato"
+    return datetime.fromtimestamp(najnoviji).strftime("%d.%m. %H:%M")
+
+
 def _parse_number(name: str, text: str, kind):
     """Prazno -> None (core ce prijaviti MissingParam); neispravno -> InvalidParam. Bez pogadjanja."""
     if text == "":
@@ -207,8 +229,10 @@ def create_app(data_dir: str | None = None, camera_source: str | None = None) ->
     calib_store = cam.CalibrationStore(store.jobs_dir.parent / "kamera")
     app.state.camera = camera
     templates = Jinja2Templates(directory=str(WEB_DIR / "templates"))
+    oznaka_koda = _oznaka_koda()
     templates.env.globals.update(L=L, version=__version__, KINDS=KINDS, KIND_LABELS=KIND_LABELS, C=C,
-                                 asset_v=_asset_version(), trace_engine_status=_trace_engine_status)
+                                 asset_v=_asset_version(), trace_engine_status=_trace_engine_status,
+                                 oznaka_koda=oznaka_koda)
     app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
 
     def page(request: Request, name: str, ctx: dict, status: int = 200) -> HTMLResponse:
@@ -272,7 +296,7 @@ def create_app(data_dir: str | None = None, camera_source: str | None = None) ->
 
     @app.get("/health")
     def health():
-        return {"status": "ok", "version": __version__}
+        return {"status": "ok", "version": __version__, "kod": oznaka_koda}
 
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request):
@@ -300,12 +324,12 @@ def create_app(data_dir: str | None = None, camera_source: str | None = None) ->
         return d
 
     def asistent_page(request, nalog=None, token="", fajl_ime="", banner=None, status=200,
-                      values=None):
+                      values=None, odgovoreno=None):
         from fabagent.core import asistent as A
         from fabagent.core.converter import SUPPORTED_EXT
         ctx = {"nalog": nalog, "token": token, "fajl_ime": fajl_ime, "banner": banner,
                "accept": ",".join(SUPPORTED_EXT), "pitanja": [], "primjedbe": [],
-               "slika_url": "", "values": values or {}}
+               "slika_url": "", "values": values or {}, "odgovoreno": odgovoreno or {}}
         if nalog is not None:
             ctx["pitanja"] = A.pitanja(nalog)
             ctx["primjedbe"] = A.primjedbe(nalog)
@@ -352,13 +376,9 @@ def create_app(data_dir: str | None = None, camera_source: str | None = None) ->
         token = str(form.get("token") or "")
         nalog = A.procitaj(tekst)
 
-        # Odgovori na pitanja popunjavaju samo ono sto iz naloga nije procitano.
-        for p in A.pitanja(nalog):
-            odgovor = str(form.get(p["polje"]) or "").strip()
-            if odgovor:
-                setattr(nalog, p["polje"],
-                        float(odgovor) if p.get("jedinica") or p.get("min") is not None
-                        else odgovor)
+        # Svi odgovori iz forme - i oni dati sada, i oni koje forma vraca iz
+        # prethodnog koraka. Bez ovog drugog pitanja se vrte u krug.
+        odgovoreno = A.primijeni_odgovore(nalog, {k: form.get(k) for k in A.POLJA_ODGOVORA})
 
         preostalo = [p["polje"] for p in A.pitanja(nalog)]
         folder = _pending_dir() / token if token else None
@@ -368,11 +388,11 @@ def create_app(data_dir: str | None = None, camera_source: str | None = None) ->
         if preostalo:
             return asistent_page(request, nalog, token, ime,
                                  banner=error_view(MissingParam("asistent", preostalo))[0],
-                                 status=HTTP_UNPROCESSABLE)
+                                 status=HTTP_UNPROCESSABLE, odgovoreno=odgovoreno)
         if not fajlovi:
             return asistent_page(request, nalog, token, ime,
                                  banner=error_view(MissingParam("asistent", ["fajl"]))[0],
-                                 status=HTTP_UNPROCESSABLE)
+                                 status=HTTP_UNPROCESSABLE, odgovoreno=odgovoreno)
 
         values = {k: str(form.get(k) or "").strip() for k in UPLOAD_VALUE_FIELDS}
         values.update(A.u_parametre(nalog))
@@ -381,7 +401,8 @@ def create_app(data_dir: str | None = None, camera_source: str | None = None) ->
             job = _process_upload(ime, fajlovi[0].read_bytes(), materijal, values)
         except FabError as exc:
             return asistent_page(request, nalog, token, ime,
-                                 banner=error_view(exc)[0], status=HTTP_UNPROCESSABLE)
+                                 banner=error_view(exc)[0], status=HTTP_UNPROCESSABLE,
+                                 odgovoreno=odgovoreno)
         from fabagent.web.api import result_template
         return page(request, result_template(job), preview_ctx(job))
 

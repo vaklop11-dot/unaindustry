@@ -53,7 +53,17 @@ može, a za ostalo pita. Ništa se ne pogađa i ništa ne ide na mašinu dok ti 
     <form method="post" action="/asistent/napravi" class="card"><div class="card-body">
       <input type="hidden" name="token" value="{{ token }}">
       <input type="hidden" name="tekst" value="{{ nalog.tekst }}">
+      {# Odgovori dati u prethodnom koraku. Bez njih se nalog cita ispocetka i
+         pitanja se vrte u krug: odgovoris A pa pita B, odgovoris B pa opet A. #}
+      {% for polje, vrijednost in odgovoreno.items() %}
+      <input type="hidden" name="{{ polje }}" value="{{ vrijednost }}">
+      {% endfor %}
       <h2 class="h6">{% if pitanja %}Treba još ovo{% else %}Sve je tu{% endif %}</h2>
+      {% if odgovoreno %}
+      <p class="small text-muted mb-2">Zapamćeno iz prethodnog koraka:
+        {% for polje, vrijednost in odgovoreno.items() %}<code>{{ polje }}={{ vrijednost }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+      </p>
+      {% endif %}
 
       {% for p in pitanja %}
       <div class="mb-3">

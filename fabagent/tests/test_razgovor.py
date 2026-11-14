@@ -331,3 +331,30 @@ def test_broj_sa_granicama_kaze_granice():
     assert p["polje"] == "sirina_mm"
     tekst = R.tekst_pitanja(p)
     assert "najmanje" in tekst and "mm" in tekst
+
+
+# ------------ odgovor koji pocinje dvosmislenom rijecju nije pitanje -----------
+@pytest.mark.parametrize("odgovor", [
+    "treba mi 0.15", "moze 0.15", "ima 0.15", "da uzmemo preset",
+    "neka ostane 100", "reci mu 85", "znaci 85",
+])
+def test_odgovor_sa_dvosmislenom_rijecju_nije_pitanje(odgovor):
+    """'treba mi 0.15' je odgovor. Da se cita kao pitanje, isti korak bi se vrtio."""
+    assert R.je_pitanje(odgovor) is False
+
+
+@pytest.mark.parametrize("pitanje", [
+    "da li moze sperploca", "je li fokus vazan", "moze li se rezati akril",
+    "ima li kerf u alatu", "treba li air assist",
+])
+def test_li_oblik_je_pitanje(pitanje):
+    assert R.je_pitanje(pitanje) is True
+
+
+def test_odgovor_treba_mi_se_upise_a_ne_ponovi_pitanje():
+    s = R.korak(R.novo(), "graviraj moju sliku 120 x 160 mm na sperplocu")
+    s = R.korak(s, "sivi tonovi")
+    assert s.cekam == "interval_mm"
+    s2 = R.korak(s, "treba mi 0.15")
+    assert s2.odgovori["interval_mm"] == 0.15
+    assert s2.cekam != "interval_mm"

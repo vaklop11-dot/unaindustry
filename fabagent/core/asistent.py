@@ -154,6 +154,38 @@ def procitaj(tekst: str) -> Nalog:
     return nalog
 
 
+# Polja koja covjek moze odgovoriti na pitanje. Forma ih mora vracati natrag
+# izmedju koraka, inace se nalog svaki put cita ispocetka i pitanja se vrte u
+# krug: odgovoris A pa pita B, odgovoris B pa opet pita A.
+POLJA_ODGOVORA = ("posao", "materijal", "sirina_mm", "visina_mm", "rezim_slike",
+                  "interval_mm", "komada")
+BROJNA_POLJA = {"sirina_mm": float, "visina_mm": float, "interval_mm": float, "komada": int}
+
+
+def primijeni_odgovore(nalog: Nalog, odgovori: dict) -> dict:
+    """Upise odgovore u nalog i vrati ono sto je primijenjeno, kao tekst.
+
+    Vraceni dict ide u formu kao skrivena polja, pa odgovor dat u jednom koraku
+    vrijedi i u sljedecem. Prazan ili neispravan odgovor se preskace - ne pogadja se.
+    """
+    primijenjeno: dict[str, str] = {}
+    for polje in POLJA_ODGOVORA:
+        sirovo = str(odgovori.get(polje) or "").strip()
+        if not sirovo:
+            continue
+        pretvori = BROJNA_POLJA.get(polje)
+        if pretvori is not None:
+            try:
+                vrijednost = pretvori(sirovo.replace(",", "."))
+            except ValueError:
+                continue
+        else:
+            vrijednost = sirovo
+        nalog.zabiljezi(polje, vrijednost, "odgovor na pitanje")
+        primijenjeno[polje] = sirovo
+    return primijenjeno
+
+
 def _izbor_materijala() -> list[dict]:
     from fabagent.web import labels as L
     return [{"vrijednost": k, "oznaka": L.choice_label("materijal", k)}

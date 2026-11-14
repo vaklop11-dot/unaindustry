@@ -32,10 +32,15 @@ from fabagent.core import config as C
 
 FAZE = ("nalog", "masina", "provjera", "gotovo")
 
-# Prva rijec po kojoj se unos cita kao pitanje, a ne kao odgovor.
+# Prva rijec po kojoj se unos cita kao pitanje, a ne kao odgovor. Samo nedvosmislene:
+# "treba", "moze", "ima" i "da" su i pocetak pitanja i pocetak odgovora ("treba mi
+# 0.15"), pa bi odgovor bio procitan kao pitanje i isti korak bi se vrtio u krug.
 PITALICE = ("sta", "shta", "sto", "koji", "koja", "koje", "koliko", "zasto", "cemu",
-            "kako", "gdje", "kad", "kada", "da", "je", "objasni", "reci", "znaci",
-            "moze", "treba", "smijem", "smije", "ima")
+            "kako", "gdje", "objasni")
+
+# Pitanja sa "li" su nedvosmislena gdje god se pojave u recenici.
+PITALICE_LI = ("da li", "je li", "jel ", "moze li", "mozes li", "treba li", "ima li",
+               "smijem li", "smije li", "hoce li", "vrijedi li", "znaci li")
 
 # Pitanja o ovome alat ne moze odgovoriti ni za jedan materijal, pa se provjerava
 # PRIJE tema: inace "koja je cijena sperploce" pogodi temu materijala (jer sadrzi
@@ -406,21 +411,15 @@ def odgovor_na_pitanje(stanje: Stanje, unos: str) -> str:
 
 
 def je_pitanje(unos: str) -> bool:
-    """Je li unos pitanje, a ne odgovor. Deterministicki: znak ? ili prva rijec."""
+    """Je li unos pitanje, a ne odgovor. Deterministicki: ? , 'li' oblik, ili prva rijec."""
     t = _bez_kvaka(unos).strip()
     if not t:
         return False
     if "?" in t:
         return True
-    prva = t.split()[0].strip(".,:;!")
-    if prva not in PITALICE:
-        return False
-    # "da" i "je" su i potvrda i pocetak pitanja ("da li...", "je li..."):
-    # pitanje je samo ako slijedi "li".
-    if prva in ("da", "je"):
-        rijeci = t.split()
-        return len(rijeci) > 1 and rijeci[1].strip(".,:;!") == "li"
-    return True
+    if any(oblik in f"{t} " for oblik in PITALICE_LI):
+        return True
+    return t.split()[0].strip(".,:;!") in PITALICE
 
 
 def je_prihvatanje(unos: str) -> bool:
