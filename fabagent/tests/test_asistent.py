@@ -117,3 +117,27 @@ def test_parametri_nose_samo_ono_sto_je_poznato():
     assert v["materijal"] == "sperploca_3mm"
     assert "sirina_mm" not in v
     assert "interval_mm" not in v
+
+
+# --------------------------------------------------------- kolicina vs dimenzije
+def test_dimenzije_nisu_kolicina():
+    """'120 x 160 mm' je dimenzija. Ranije je x iz dimenzije citan kao 120 komada."""
+    n = A.procitaj("graviraj sliku 120 x 160 mm na sperplocu")
+    assert n.komada is None
+    assert (n.sirina_mm, n.visina_mm) == (120.0, 160.0)
+
+
+@pytest.mark.parametrize("tekst,ocekivano", [
+    ("napravi 5 kom privjeska", 5),
+    ("treba mi 12 komada", 12),
+    ("uradi to 3 puta", 3),
+    ("5x privjesak", 5),
+])
+def test_kolicina_se_jos_cita(tekst, ocekivano):
+    assert A.procitaj(tekst).komada == ocekivano
+
+
+def test_kolicina_i_dimenzije_zajedno():
+    n = A.procitaj("napravi 4 kom plocica 50 x 30 mm")
+    assert n.komada == 4
+    assert (n.sirina_mm, n.visina_mm) == (50.0, 30.0)

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import secrets
 import base64
 import hashlib
@@ -380,6 +381,101 @@ def create_app(data_dir: str | None = None, camera_source: str | None = None) ->
             job = _process_upload(ime, fajlovi[0].read_bytes(), materijal, values)
         except FabError as exc:
             return asistent_page(request, nalog, token, ime,
+                                 banner=error_view(exc)[0], status=HTTP_UNPROCESSABLE)
+        from fabagent.web.api import result_template
+        return page(request, result_template(job), preview_ctx(job))
+
+    # ---------------------------------------------------------- razgovor
+    # Stanje razgovora ide kroz formu kao base64 JSON, pa server ne drzi sesiju.
+    # Sto se ne procita iz tokena, pocinje novi razgovor - nikad polupopunjen.
+    def _razgovor_token(stanje) -> str:
+        sirovo = json.dumps(stanje.kao_dict(), ensure_ascii=False).encode("utf-8")
+        return base64.urlsafe_b64encode(sirovo).decode("ascii")
+
+    def _razgovor_iz_tokena(token: str):
+        from fabagent.core import razgovor as Rz
+        if not token:
+            return Rz.novo()
+        try:
+            sirovo = base64.urlsafe_b64decode(token.encode("ascii")).decode("utf-8")
+            return Rz.iz_dicta(json.loads(sirovo))
+        except Exception:
+            return Rz.novo()
+
+    def razgovor_page(request, stanje, token="", fajl_ime="", banner=None, status=200):
+        from fabagent.core import razgovor as Rz
+        from fabagent.core.converter import SUPPORTED_EXT
+        blokade, upozorenja = Rz.provjera_prije_starta(stanje)
+        pitanje = Rz.sljedece_pitanje(stanje)
+        ctx = {"stanje": stanje, "stanje_token": _razgovor_token(stanje),
+               "token": token, "fajl_ime": fajl_ime, "banner": banner,
+               "accept": ",".join(SUPPORTED_EXT), "pitanje": pitanje,
+               "pitanje_tekst": Rz.tekst_pitanja(pitanje),
+               "parametri": Rz.parametri_masine(stanje), "blokade": blokade,
+               "upozorenja": upozorenja, "teme": [n for n, _, _ in Rz.ZNANJE],
+               "spremno": stanje.faza == "gotovo" and not blokade}
+        return page(request, "razgovor.html", ctx, status)
+
+    @app.get("/razgovor", response_class=HTMLResponse)
+    def razgovor_novi(request: Request):
+        from fabagent.core import razgovor as Rz
+        return razgovor_page(request, Rz.novo())
+
+    @app.post("/razgovor", response_class=HTMLResponse)
+    async def razgovor_korak(request: Request):
+        from fabagent.core import razgovor as Rz
+        form = await request.form()
+        stanje = _razgovor_iz_tokena(str(form.get("stanje") or ""))
+        token = str(form.get("token") or "")
+        fajl_ime = str(form.get("fajl_ime") or "")
+
+        f = form.get("fajl")
+        if f is not None and getattr(f, "filename", ""):
+            data = await f.read(C.UPLOAD_MAX_BYTES + 1)
+            token = secrets.token_hex(8)
+            fajl_ime = Path(f.filename).name
+            folder = _pending_dir() / token
+            folder.mkdir(parents=True, exist_ok=True)
+            (folder / fajl_ime).write_bytes(data)
+            stanje.kaze("asistent", f"Fajl primljen: {fajl_ime}")
+
+        unos = str(form.get("unos") or "").strip()
+        if unos:
+            stanje = Rz.korak(stanje, unos)
+        elif not fajl_ime:
+            return razgovor_page(request, stanje, token, fajl_ime,
+                                 banner=error_view(MissingParam("razgovor", ["unos"]))[0],
+                                 status=HTTP_UNPROCESSABLE)
+        return razgovor_page(request, stanje, token, fajl_ime)
+
+    @app.post("/razgovor/napravi", response_class=HTMLResponse)
+    async def razgovor_napravi(request: Request):
+        from fabagent.core import razgovor as Rz
+        form = await request.form()
+        stanje = _razgovor_iz_tokena(str(form.get("stanje") or ""))
+        token = str(form.get("token") or "")
+        fajl_ime = str(form.get("fajl_ime") or "")
+
+        blokade, _ = Rz.provjera_prije_starta(stanje)
+        if blokade:
+            return razgovor_page(request, stanje, token, fajl_ime,
+                                 banner=error_view(InvalidParam("; ".join(blokade)))[0],
+                                 status=HTTP_UNPROCESSABLE)
+
+        folder = _pending_dir() / token if token else None
+        fajlovi = sorted(folder.glob("*")) if folder and folder.is_dir() else []
+        if not fajlovi:
+            return razgovor_page(request, stanje, token, fajl_ime,
+                                 banner=error_view(MissingParam("razgovor", ["fajl"]))[0],
+                                 status=HTTP_UNPROCESSABLE)
+
+        values = {k: "" for k in UPLOAD_VALUE_FIELDS}
+        values.update(Rz.u_parametre(stanje))
+        materijal = values.pop("materijal", "") or (Rz.nalog(stanje).materijal or "")
+        try:
+            job = _process_upload(fajlovi[0].name, fajlovi[0].read_bytes(), materijal, values)
+        except FabError as exc:
+            return razgovor_page(request, stanje, token, fajl_ime,
                                  banner=error_view(exc)[0], status=HTTP_UNPROCESSABLE)
         from fabagent.web.api import result_template
         return page(request, result_template(job), preview_ctx(job))

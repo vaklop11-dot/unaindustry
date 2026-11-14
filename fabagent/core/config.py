@@ -513,6 +513,17 @@ GRBL_BAUD_RATE = 115200
 GRBL_HOME_CMD = "$H"                 # homing ciklus (G28 na GRBL-u ide na snimljenu poziciju, nije homing)
 MACHINE_ORIGIN = "dolje-lijevo"      # ishodiste masine; SVG/editor koriste gore-lijevo -> Y se okrece
 GCODE_DECIMALS = 3
+
+# Sirina koju laser odnese (kerf). None znaci NIJE IZMJERENO - nema pretpostavljene
+# vrijednosti jer kerf zavisi od materijala, debljine i fokusa. Mjeri se tako da se
+# izreze poznata mjera i izmjeri kaliperom: kerf = nominalno - izmjereno.
+# Kad se izmjeri, upisi po materijalu: {"sperploca_3mm": 0.18, ...}
+LASER_KERF_MM: float | None = None
+LASER_KERF_PO_MATERIJALU: dict[str, float] = {}
+
+# Granice radne povrsine se potvrdjuju na masini komandom $$ ($130 = max put X,
+# $131 = max put Y). Dok je ovo False, LASER_WORK_AREA_MM je DEKLARISANO, ne izmjereno.
+LASER_BOUNDS_CONFIRMED = False
 LAYER_MODES = ("Cut", "Engrave", "Score")
 LAYER_DEFAULT_MODE = {"CUT": "Cut", "ENGRAVE": "Engrave", "SCORE": "Score"}
 LAYER_SPEED_RANGE_MM_S = (1.0, GRBL_MAX_FEED_MM_MIN / 60.0)

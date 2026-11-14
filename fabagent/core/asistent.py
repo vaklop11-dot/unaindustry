@@ -143,7 +143,11 @@ def procitaj(tekst: str) -> Nalog:
     if any(_bez_kvaka(r) in t for r in POZADINA_RIJECI):
         nalog.zabiljezi("ukloni_pozadinu", True, "rijec u nalogu")
 
-    komada = re.search(r"(\d+)\s*(kom|komad|komada|puta|x\b)", t)
+    # Kolicina: "5 kom", "5 komada", "5 puta", ili "5x" - ali NE "120 x 160 mm",
+    # gdje je x izmedju dva broja i oznacava dimenziju, a ne broj komada.
+    komada = re.search(r"(\d+)\s*(?:kom\b|komad|komada|puta)", t)
+    if not komada:
+        komada = re.search(r"(\d+)\s*[x×](?!\s*\d)", t)
     if komada:
         nalog.zabiljezi("komada", int(komada.group(1)), "kolicina u nalogu")
 

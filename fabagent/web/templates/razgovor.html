@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Razgovor{% endblock %}
+{% block content %}
+<h1 class="h4 mb-1">Razgovor sa asistentom</h1>
+<p class="text-muted small mb-3">
+  Piši svojim riječima. Asistent pita jedno po jedno i pamti dogovoreno. Možeš ga
+  i prekinuti pitanjem — odgovori, pa se vrati na isto mjesto. Radi bez interneta:
+  svaki broj dolazi iz <code>config.py</code>, iz preseta materijala ili iz računa
+  nad onim što si rekao. Čega nema, kaže da nema. <strong>Start pritiskaš ti.</strong>
+</p>
+
+{% include "partials/error_banner.html" %}
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-body">
+        <div class="razgovor-dnevnik mb-3">
+          {% for red in stanje.dnevnik %}
+          <div class="d-flex mb-2 {% if red.ko == 'operater' %}justify-content-end{% endif %}">
+            <div class="razgovor-balon {% if red.ko == 'operater' %}razgovor-ja{% else %}razgovor-on{% endif %}">
+              <div class="small text-muted mb-1">{% if red.ko == 'operater' %}Ti{% else %}Asistent{% endif %}</div>
+              <div style="white-space:pre-line">{{ red.tekst }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <form method="post" action="/razgovor" enctype="multipart/form-data">
+          <input type="hidden" name="stanje" value="{{ stanje_token }}">
+          <input type="hidden" name="token" value="{{ token }}">
+          <input type="hidden" name="fajl_ime" value="{{ fajl_ime }}">
+          {% if pitanje %}
+          <p class="small mb-2"><strong>Čeka se:</strong> {{ pitanje_tekst }}</p>
+          {% endif %}
+          <div class="input-group">
+            <input class="form-control form-control-lg" type="text" name="unos" autofocus
+                   autocomplete="off"
+                   placeholder="{% if pitanje %}odgovor, ili pitaj nešto{% else %}napiši nalog ili pitanje{% endif %}">
+            <button class="btn btn-primary btn-lg" type="submit">Pošalji</button>
+          </div>
+          {% if pitanje and pitanje.izbor %}
+          <div class="mt-2 d-flex flex-wrap gap-1">
+            {% for i in pitanje.izbor %}
+            <button class="btn btn-outline-secondary btn-sm" type="submit"
+                    name="unos" value="{{ i.vrijednost }}">{{ i.oznaka }}</button>
+            {% endfor %}
+          </div>
+          {% endif %}
+          <div class="row g-2 mt-2 align-items-center">
+            <div class="col-sm">
+              <input class="form-control form-control-sm" type="file" name="fajl" accept="{{ accept }}">
+            </div>
+            <div class="col-sm-auto">
+              <span class="small text-muted">Fajl: <code>{{ fajl_ime or 'nije priložen' }}</code></span>
+            </div>
+          </div>
+        </form>
+
+        {% if spremno %}
+        <form method="post" action="/razgovor/napravi" class="mt-3">
+          <input type="hidden" name="stanje" value="{{ stanje_token }}">
+          <input type="hidden" name="token" value="{{ token }}">
+          <input type="hidden" name="fajl_ime" value="{{ fajl_ime }}">
+          <button class="btn btn-success btn-lg" type="submit">Napravi posao</button>
+          <span class="small text-muted ms-2">Pravi fajl. Laser se ne pokreće.</span>
+        </form>
+        {% endif %}
+
+        <p class="small text-muted mt-3 mb-0">
+          Mogu te pitati o: {{ teme|join(', ') }}.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card mb-3">
+      <div class="card-body">
+        <h2 class="h6">Dogovoreni parametri</h2>
+        {% if parametri %}
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Operacija</th><th>Parametar</th><th>Vrijednost</th><th>Izvor</th></tr></thead>
+          <tbody>
+          {% for r in parametri %}
+            <tr>
+              <td class="small">{{ r.operacija }}</td>
+              <td class="small">{{ r.parametar }}</td>
+              <td class="small">{{ r.vrijednost }}</td>
+              <td class="small {% if r.iz == 'preset' %}text-warning{% else %}text-success{% endif %}">{{ r.iz }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        <p class="small text-muted mt-2 mb-0">
+          Izvor <span class="text-warning">preset</span> znači polazna vrijednost koja
+          nije mjerena na tvojoj mašini. <span class="text-success">operater</span>
+          znači da si je ti dao.
+        </p>
+        {% else %}
+        <p class="small text-muted mb-0">Još ništa nije dogovoreno.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if blokade %}
+    <div class="alert alert-danger" role="alert">
+      <strong>Ovo zaustavlja posao</strong>
+      <ul class="mb-0 small">{% for b in blokade %}<li>{{ b }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+
+    {% if upozorenja %}
+    <div class="alert alert-warning" role="alert">
+      <strong>Mora se znati prije starta</strong>
+      <ul class="mb-0 small">{% for u in upozorenja %}<li>{{ u }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-body">
+        <h2 class="h6">Pročitano iz naloga</h2>
+        {% set n = stanje.odgovori %}
+        <p class="small text-muted mb-1">Nalog: <code>{{ stanje.tekst_naloga or '—' }}</code></p>
+        <p class="small text-muted mb-0">Faza: <code>{{ stanje.faza }}</code></p>
+      </div>
+    </div>
+
+    <p class="small text-muted mt-3 mb-0">
+      Kad posao bude napravljen, idi na <a href="/machine">Laser</a>:
+      Home, pa <strong>Frame</strong> (vozi okvir sa ugašenim laserom), pa Start.
+      Pause i Stop su na toj istoj stranici.
+    </p>
+  </div>
+</div>
+{% endblock %}
