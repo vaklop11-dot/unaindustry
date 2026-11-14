@@ -152,9 +152,10 @@ def nepotrebna_pitanja(stanje: Stanje) -> tuple[str, ...]:
 def novo() -> Stanje:
     s = Stanje()
     s.kaze("asistent",
-           "Napisi sta radimo, svojim rijecima. Npr: graviraj sliku 120 x 160 mm na "
-           "sperplocu, sivi tonovi. Mozes me i pitati bilo sta o parametrima - pitaj "
-           "'koji razmak linija' ili 'sta je kerf'. Start na kraju pritiskas ti.")
+           "Prilozi fajl i napisi sta radimo, svojim rijecima. Npr: graviraj sliku "
+           "120 x 160 mm na sperplocu, sivi tonovi. Mozes me i pitati bilo sta o "
+           "parametrima - pitaj 'koji razmak linija' ili 'sta je kerf'. "
+           "Start na kraju pritiskas ti.")
     return s
 
 
@@ -559,8 +560,26 @@ def pitanja_naloga(stanje: Stanje) -> list[dict]:
     return [p for p in A.pitanja(nalog(stanje)) if p["polje"] not in preskoci]
 
 
+def _pitanje_fajla(stanje: Stanje) -> dict | None:
+    """Fajl se trazi PRVI: bez njega nema sta da se napravi, a vrsta fajla
+    odlucuje i koja pitanja uopste imaju smisla (vektor nema piksele).
+
+    Ranije se fajl nije trazio nigdje, pa bi operater odgovorio na sva pitanja,
+    pritisnuo 'Napravi posao' i dobio gresku 'obavezni parametri nedostaju: fajl'.
+    """
+    if stanje.fajl:
+        return None
+    return {"polje": "fajl", "jedinica": "",
+            "pitanje": "Prilozi fajl dugmetom za izbor fajla ispod (SVG, DXF, PDF, PNG, JPG). "
+                       "Bez njega nema sta da se napravi. Nalog mozes pisati i sada - "
+                       "citam ga dok fajl ne stigne."}
+
+
 def sljedece_pitanje(stanje: Stanje) -> dict | None:
     """Pitanje na koje se ceka odgovor, po trenutnoj fazi. None kad nema vise."""
+    p = _pitanje_fajla(stanje)
+    if p is not None:
+        return p
     preostalo = pitanja_naloga(stanje)
     if preostalo:
         return preostalo[0]
@@ -685,9 +704,10 @@ def korak(stanje: Stanje, unos: str) -> Stanje:
                else "Zapisano. Sve je uneseno.")
         return s
 
-    # Ako stanje ne ceka nista konkretno, prvi unos je tekst naloga.
-    if not s.cekam and not s.tekst_naloga:
-        s.tekst_naloga = tekst
+    # Fajl se ne upisuje kucanjem - dok se ceka fajl, tekst je nalog.
+    # Isto vrijedi za prvi unos, kad se jos nista konkretno ne ceka.
+    if p["polje"] == "fajl" or (not s.cekam and not s.tekst_naloga):
+        s.tekst_naloga = f"{s.tekst_naloga} {tekst}".strip()
         procitano = nalog(s).procitano
         if procitano:
             spisak = ", ".join(f"{k} = {v['vrijednost']}" for k, v in procitano.items())
@@ -720,6 +740,8 @@ def provjera_prije_starta(stanje: Stanje) -> tuple[list[str], list[str]]:
     blokade: list[str] = []
     upozorenja: list[str] = []
 
+    if not stanje.fajl:
+        blokade.append("Fajl nije prilozen.")
     if n.posao is None:
         blokade.append("Vrsta posla nije odredjena.")
     if n.materijal is None:

@@ -471,6 +471,12 @@ def create_app(data_dir: str | None = None, camera_source: str | None = None) ->
         unos = str(form.get("unos") or "").strip()
         if unos:
             stanje = Rz.korak(stanje, unos)
+        elif stanje.fajl:
+            # Fajl je stigao bez teksta: reci sta je sljedece, ne cekaj da pita.
+            sljedece = Rz.sljedece_pitanje(stanje)
+            stanje.cekam = sljedece["polje"] if sljedece else ""
+            stanje.kaze("asistent", Rz.tekst_pitanja(sljedece) if sljedece
+                        else "Sve je uneseno. Provjera je ispod. Start pritiskas ti.")
         elif not fajl_ime:
             return razgovor_page(request, stanje, token, fajl_ime,
                                  banner=error_view(MissingParam("razgovor", ["unos"]))[0],

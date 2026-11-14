@@ -63,7 +63,7 @@ def test_prazan_unos_se_odbija(klijent):
 def test_pokvareno_stanje_pocinje_novi_razgovor(klijent):
     r = klijent.post("/razgovor", data={"stanje": "ovo-nije-base64-json", "unos": "zdravo"})
     assert r.status_code == 200
-    assert "Napisi sta radimo" in r.text or "Napiši" in r.text
+    assert "Prilozi fajl" in r.text or "Priloži" in r.text
 
 
 def test_nalog_se_procita_i_prikaze(klijent):
@@ -89,12 +89,24 @@ def test_cijena_dobije_ne_znam(klijent):
 
 def test_parametri_se_prikazuju_sa_izvorom(klijent):
     s = stanje_iz(klijent.get("/razgovor").text)
-    t = posalji(klijent, s, NALOG).text
-    t = posalji(klijent, stanje_iz(t), "0.15").text
-    t = posalji(klijent, stanje_iz(t), "da").text
+    r = posalji(klijent, s, NALOG, files={"fajl": ("motiv.png", slika_bajtovi(), "image/png")})
+    token, t = TOKEN_RE.search(r.text).group(1), r.text
+    for unos in ("0.15", "da"):
+        t = posalji(klijent, stanje_iz(t), unos, token=token, fajl_ime="motiv.png").text
     assert "Postavke mašine" in t
     assert "mm/min" in t
     assert "preset" in t
+
+
+def test_bez_fajla_nema_dugmeta_nego_blokada(klijent):
+    """Ranije: odgovoris na sve, pritisnes dugme i dobijes 'nedostaju: fajl'."""
+    s = stanje_iz(klijent.get("/razgovor").text)
+    t = posalji(klijent, s, NALOG).text
+    assert "Prilozi fajl" in t
+    for unos in ("0.15", "da"):
+        t = posalji(klijent, stanje_iz(t), unos).text
+    assert "Napravi posao" not in t
+    assert "Fajl nije prilozen" in t
 
 
 def test_blokade_se_prikazuju(klijent):
