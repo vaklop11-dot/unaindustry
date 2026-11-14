@@ -761,8 +761,9 @@ def provjera_kamere(kamera: dict | None) -> list[str]:
         return [f"Kamera NE RADI ({greska}). Bez nje nemas sliku stola sa svog mjesta - "
                 f"ili je popravi, ili budi uz masinu dok radi."]
     if not kamera.get("kalibrisana"):
-        return ["Kamera radi ali NIJE kalibrisana, pa slika nije vezana za koordinate "
-                "lasera. Otvori /camera i klikni 4 ugla radne povrsine."]
+        return ["Kamera NIJE kalibrisana - slika nije vezana za koordinate lasera. "
+                "Posao se moze napraviti i bez nje; nadzor sa mjesta je ono sto fali. "
+                "Kalibracija je na /camera."]
     sati = kamera.get("sati")
     if sati is not None and sati > C.CAMERA_CALIBRATION_MAX_AGE_H:
         kada = str(kamera.get("kreirana") or "")[:16].replace("T", " ")

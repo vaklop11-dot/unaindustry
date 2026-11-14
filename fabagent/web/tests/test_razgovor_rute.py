@@ -176,3 +176,16 @@ def test_kamera_panel_je_na_stranici(klijent):
 def test_nekalibrisana_kamera_se_javlja_u_upozorenjima(klijent):
     t = klijent.get("/razgovor").text
     assert "Nije kalibrisana" in t or "NIJE kalibrisana" in t
+
+
+def test_jedna_vrata_u_navigaciji(klijent):
+    """Dvije stranice za isti posao su operatera odvele na pogresnu. Nudi se jedna."""
+    t = klijent.get("/razgovor").text
+    assert 'href="/razgovor"' in t
+    assert 'href="/asistent"' not in t
+
+
+def test_stara_stranica_i_dalje_radi_i_upucuje_dalje(klijent):
+    t = klijent.get("/asistent").text
+    assert "Razgovor" in t
+    assert 'href="/razgovor"' in t
