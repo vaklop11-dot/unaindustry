@@ -116,11 +116,12 @@ def test_blokade_se_prikazuju(klijent):
     assert "Materijal" in t
 
 
-def test_upozorenje_o_granicama_i_kerfu(klijent):
+def test_upozorenje_o_kerfu_ostaje_a_o_granicama_nestaje(klijent):
+    """Granice su izmjerene na masini, pa to upozorenje odlazi. Kerf nije - ostaje."""
     s = stanje_iz(klijent.get("/razgovor").text)
     t = posalji(klijent, s, NALOG).text
-    assert "$130" in t
-    assert "Kerf" in t or "kerf" in t
+    assert "Kerf nije izmjeren" in t
+    assert "nisu potvrdjene na masini" not in t
 
 
 def test_fajl_se_primi_i_zapamti(klijent):

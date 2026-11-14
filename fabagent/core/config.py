@@ -25,7 +25,9 @@ GEOMETRY_EPS_MM = 1e-6          # numericka tolerancija za poredjenje koordinata
 # Masine
 # ---------------------------------------------------------------------------
 LASER_MACHINE_NAME = "ArgoLaser MK20 (20 W opticka dioda)"
-LASER_WORK_AREA_MM = (400.0, 400.0)            # PROVJERITI: radna povrsina (X, Y)
+# IZMJERENO na masini 14.11.2026, COM4, komandom $$: $130 = 400.000, $131 = 400.000.
+# Stranica proizvodjaca navodi 400 x 410 mm - masina kaze 400 x 400. Vrijedi masina.
+LASER_WORK_AREA_MM = (400.0, 400.0)            # IZMJERENO ($130, $131)
 PRINTER_NAME = "FDM printer"
 PRINTER_BUILD_VOLUME_MM = (220.0, 220.0, 250.0)  # PROVJERITI: radni volumen (X, Y, Z)
 
@@ -503,12 +505,17 @@ CAMERA_MIN_QUAD_AREA_PX = 2000.0     # min povrsina cetverougla kalibracije (u p
 CAMERA_OVERLAY_OPACITY = 0.6
 
 # ---------------------------------------------------------------------------
-# Upravljanje laserom - GRBL (core/gcode.py, web /machine)  -  PROVJERITI za svoju masinu
+# Upravljanje laserom - GRBL (core/gcode.py, web /machine)
+# IZMJERENO sa masine 14.11.2026, COM4 (USB VID:PID 303A:4003), komandom $$:
+#   $30=1000  $32=1  $100=100  $101=100  $110=20040  $111=18040  $130=400  $131=400
+# Odgovor na '?': <Idle|MPos:0.000,0.000,0.000|...>
 # ---------------------------------------------------------------------------
-GRBL_S_MAX = 1000                    # $30 (max spindle/laser S vrijednost)
-GRBL_LASER_MODE_CMD = "M4"           # M4 = dinamicka snaga (preporuka za diodu, $32=1); M3 = konstantna
-GRBL_MAX_FEED_MM_MIN = 10000.0       # $110/$111 - max brzina osa
-GRBL_TRAVEL_FEED_MM_MIN = 6000.0     # brzina praznog hoda za procjenu vremena (G0 koristi $110)
+GRBL_S_MAX = 1000                    # $30 - IZMJERENO
+GRBL_LASER_MODE_CMD = "M4"           # M4 = dinamicka snaga; masina ima $32=1, pa M4 radi
+# $110 = 20040 (X), $111 = 18040 (Y). Uzima se sporija osa: dijagonalni pokret je
+# ogranicen objema, pa bi brzina po brzoj osi bila broj koji masina ne moze drzati.
+GRBL_MAX_FEED_MM_MIN = 18040.0       # IZMJERENO (min od $110, $111)
+GRBL_TRAVEL_FEED_MM_MIN = 18040.0    # prazan hod: G0 ide po $110/$111, ne po izmisljenom broju
 GRBL_BAUD_RATE = 115200
 GRBL_HOME_CMD = "$H"                 # homing ciklus (G28 na GRBL-u ide na snimljenu poziciju, nije homing)
 MACHINE_ORIGIN = "dolje-lijevo"      # ishodiste masine; SVG/editor koriste gore-lijevo -> Y se okrece
@@ -521,9 +528,9 @@ GCODE_DECIMALS = 3
 LASER_KERF_MM: float | None = None
 LASER_KERF_PO_MATERIJALU: dict[str, float] = {}
 
-# Granice radne povrsine se potvrdjuju na masini komandom $$ ($130 = max put X,
-# $131 = max put Y). Dok je ovo False, LASER_WORK_AREA_MM je DEKLARISANO, ne izmjereno.
-LASER_BOUNDS_CONFIRMED = False
+# Granice radne povrsine su potvrdjene na masini komandom $$ ($130 = max put X,
+# $131 = max put Y), 14.11.2026 na portu COM4.
+LASER_BOUNDS_CONFIRMED = True
 
 # Nakon koliko sati se kalibracija kamere smatra zastarjelom. Kamera ili laser se
 # pomjere i ne primijeti se; kalibracija koja vise ne odgovara daje lazan osjecaj

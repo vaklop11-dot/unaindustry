@@ -157,16 +157,28 @@ def test_kerf_cita_izmjerenu_vrijednost(monkeypatch):
     assert "NEMA PODATKA" not in tekst
 
 
-def test_granice_kazu_da_nisu_potvrdjene():
+def test_granice_su_izmjerene_na_masini():
+    """$130 i $131 su procitani sa masine 14.11.2026 - vise nisu deklarisani."""
     tekst = R.odgovor_na_pitanje(R.novo(), "koje su granice radne povrsine?")
-    assert "$130" in tekst and "$131" in tekst
-    assert "DEKLARISANA" in tekst
-
-
-def test_granice_kad_su_potvrdjene(monkeypatch):
-    monkeypatch.setattr(C, "LASER_BOUNDS_CONFIRMED", True)
-    tekst = R.odgovor_na_pitanje(R.novo(), "koje su granice?")
     assert "potvrdjena" in tekst
+    assert "400" in tekst
+    assert "DEKLARISANA" not in tekst
+
+
+def test_granice_kad_nisu_potvrdjene(monkeypatch):
+    monkeypatch.setattr(C, "LASER_BOUNDS_CONFIRMED", False)
+    tekst = R.odgovor_na_pitanje(R.novo(), "koje su granice?")
+    assert "DEKLARISANA" in tekst
+    assert "$130" in tekst and "$131" in tekst
+
+
+def test_izmjerene_vrijednosti_masine_su_u_configu():
+    """Brojevi dolaze iz $$ na COM4, ne iz procjene."""
+    assert C.LASER_BOUNDS_CONFIRMED is True
+    assert C.LASER_WORK_AREA_MM == (400.0, 400.0)
+    assert C.GRBL_S_MAX == 1000                      # $30
+    assert C.GRBL_MAX_FEED_MM_MIN == 18040.0         # min($110=20040, $111=18040)
+    assert C.LAYER_SPEED_RANGE_MM_S[1] == 18040.0 / 60.0
 
 
 def test_brzina_daje_i_mm_min():
