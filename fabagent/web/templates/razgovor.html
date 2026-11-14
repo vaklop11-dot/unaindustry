@@ -77,6 +77,34 @@
   <div class="col-lg-5">
     <div class="card mb-3">
       <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h2 class="h6 mb-0">Kamera — radna površina</h2>
+          <a class="small" href="/camera">kalibracija</a>
+        </div>
+        <img src="/camera/stream" alt="živa slika radne površine" class="img-fluid rounded border"
+             style="width:100%;background:#000;min-height:7rem"
+             onerror="this.style.display='none';document.getElementById('kam-greska').hidden=false">
+        <div id="kam-greska" hidden class="small text-danger mt-2">
+          Kamera ne daje sliku. Provjeri da je nijedan drugi program ne drži
+          (Teams, Zoom, Chrome) i osvježi stranicu.
+        </div>
+        <p class="small text-muted mt-2 mb-0">
+          Izvor: <code>{{ kamera.izvor }}</code>.
+          {% if kamera.kalibrisana %}
+            Kalibrisana {{ (kamera.kreirana or '')[:16]|replace('T', ' ') }}{% if kamera.sati is not none %},
+            prije {{ '%.0f'|format(kamera.sati) }} h{% endif %}.
+          {% else %}
+            <span class="text-warning">Nije kalibrisana</span> — slika nije vezana za
+            koordinate lasera.
+          {% endif %}
+        </p>
+        <p class="small text-muted mb-0">Ovo je nadzor sa tvog mjesta: gledaš ovdje,
+          a Pause i Stop su na <a href="/machine">/machine</a>.</p>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-body">
         <h2 class="h6">Poznato o poslu</h2>
         {% if procitano %}
         <table class="table table-sm mb-2">

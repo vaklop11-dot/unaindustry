@@ -373,6 +373,17 @@ def _znanje_gdje_smo(stanje: Stanje) -> str:
     return f"{tekst} Sljedece mi treba: {tekst_pitanja(p)}" if p else tekst
 
 
+def _znanje_kamera(stanje: Stanje) -> str:
+    return (f"Kamera na laptopu gleda radnu povrsinu i daje zivu sliku dok laser radi. "
+            f"Zato nadzor ne znaci stajanje uz masinu - gledas sa svog mjesta, a Pause i "
+            f"Stop su na stranici /machine. Slika je na /camera, a uzivo je i ovdje u "
+            f"razgovoru dok posao postavljas. Kalibracija: otvoris /camera i klikne se "
+            f"4 ugla radne povrsine, cime se slika veze za koordinate lasera "
+            f"({_g(C.LASER_WORK_AREA_MM[0])} x {_g(C.LASER_WORK_AREA_MM[1])} mm). "
+            f"Kalibracija starija od {_g(C.CAMERA_CALIBRATION_MAX_AGE_H)} h se racuna "
+            f"zastarjelom jer se kamera ili laser mogu pomjeriti a da se ne primijeti.")
+
+
 def _znanje_bez_mreze(stanje: Stanje) -> str:
     return ("Radim bez interneta. Nema API kljuca i nema poziva van ovog racunara. "
             "Nisam model koji pogadja - svaki broj koji ti kazem dolazi iz config.py, "
@@ -401,6 +412,8 @@ ZNANJE = (
      _znanje_materijali),
     ("ovaj materijal", ("materijal", "sperploc", "mdf", "pleksi", "akril", "koz",
                         "aluminij", "celik", "termos"), _znanje_materijal_ovaj),
+    ("kamera i nadzor", ("kamer", "nadzor", "zivu sliku", "ziva slika", "uzivo",
+                         "vidim sto", "snimak", "kalibracij"), _znanje_kamera),
     ("gdje smo", ("gdje smo", "sta sad", "sta dalje", "sta imamo", "sta je ostalo",
                   "dokle smo", "rekapitulacij"), _znanje_gdje_smo),
     ("rad bez mreze", ("internet", "mrez", "api", "kljuc", "offline", "off grid",
@@ -734,11 +747,35 @@ def korak(stanje: Stanje, unos: str) -> Stanje:
 
 
 # --------------------------------------------------------- provjera i parametri
-def provjera_prije_starta(stanje: Stanje) -> tuple[list[str], list[str]]:
+def provjera_kamere(kamera: dict | None) -> list[str]:
+    """Sto o nadzoru kamerom mora da se zna prije nego se laser upali.
+
+    Nadzor ne znaci stajanje uz masinu: kamera uperena u sto i otvorena u pregledu
+    je ono sto cini nadzor sa mjesta mogucim. Zato se njeno stanje provjerava
+    zajedno sa ostalim, a ne usput.
+    """
+    if kamera is None:
+        return []
+    if not kamera.get("radi", True):
+        greska = kamera.get("greska") or "kamera se ne otvara"
+        return [f"Kamera NE RADI ({greska}). Bez nje nemas sliku stola sa svog mjesta - "
+                f"ili je popravi, ili budi uz masinu dok radi."]
+    if not kamera.get("kalibrisana"):
+        return ["Kamera radi ali NIJE kalibrisana, pa slika nije vezana za koordinate "
+                "lasera. Otvori /camera i klikni 4 ugla radne povrsine."]
+    sati = kamera.get("sati")
+    if sati is not None and sati > C.CAMERA_CALIBRATION_MAX_AGE_H:
+        kada = str(kamera.get("kreirana") or "")[:16].replace("T", " ")
+        return [f"Kalibracija kamere je od {kada} ({sati:.0f} h). Ako si pomjerao kameru "
+                f"ili laser, uradi je ponovo - inace slika pokazuje pogresno mjesto."]
+    return []
+
+
+def provjera_prije_starta(stanje: Stanje, kamera: dict | None = None) -> tuple[list[str], list[str]]:
     """(blokade, upozorenja). Blokada zaustavlja posao; upozorenje mora da se zna."""
     n = nalog(stanje)
     blokade: list[str] = []
-    upozorenja: list[str] = []
+    upozorenja: list[str] = list(provjera_kamere(kamera))
 
     if not stanje.fajl:
         blokade.append("Fajl nije prilozen.")

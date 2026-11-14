@@ -464,3 +464,49 @@ def test_sa_fajlom_tok_dolazi_do_gotovo():
     s = R.korak(s, "da")
     assert s.faza == "gotovo"
     assert R.provjera_prije_starta(s)[0] == []
+
+
+# --------------------------- kamera kao nadzor sa mjesta ----------------------
+def test_kamera_ne_radi_je_upozorenje():
+    poruke = R.provjera_kamere({"radi": False, "greska": "ne otvara se indeks 0"})
+    assert poruke and "NE RADI" in poruke[0]
+    assert "ne otvara se indeks 0" in poruke[0]
+
+
+def test_nekalibrisana_kamera_je_upozorenje():
+    poruke = R.provjera_kamere({"radi": True, "kalibrisana": False})
+    assert poruke and "NIJE kalibrisana" in poruke[0]
+    assert "/camera" in poruke[0]
+
+
+def test_zastarjela_kalibracija_je_upozorenje():
+    stara = C.CAMERA_CALIBRATION_MAX_AGE_H + 10
+    poruke = R.provjera_kamere({"radi": True, "kalibrisana": True,
+                                "kreirana": "2026-11-13T07:54:00", "sati": stara})
+    assert poruke and "pomjerao kameru" in poruke[0]
+    assert "2026-11-13 07:54" in poruke[0]
+
+
+def test_svjeza_kalibracija_ne_javlja_nista():
+    assert R.provjera_kamere({"radi": True, "kalibrisana": True, "sati": 1.0}) == []
+
+
+def test_bez_podatka_o_kameri_nema_izmisljanja():
+    assert R.provjera_kamere(None) == []
+
+
+def test_kamera_ulazi_u_provjeru_prije_starta():
+    s = _novo()
+    s = R.korak(s, "graviraj sliku 100 x 100 mm na sperplocu, sivi tonovi")
+    s = R.korak(R.korak(s, "0.15"), "da")
+    _, bez = R.provjera_prije_starta(s)
+    _, sa = R.provjera_prije_starta(s, {"radi": True, "kalibrisana": False})
+    assert len(sa) == len(bez) + 1
+    assert any("NIJE kalibrisana" in u for u in sa)
+
+
+def test_znanje_o_kameri():
+    tekst = R.odgovor_na_pitanje(R.novo(), "kako radi kamera?")
+    assert "/camera" in tekst
+    assert "4 ugla" in tekst
+    assert "ne znaci stajanje uz masinu" in tekst

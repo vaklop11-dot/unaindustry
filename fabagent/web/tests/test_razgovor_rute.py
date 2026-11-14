@@ -162,3 +162,16 @@ def test_cio_tok_pravi_posao(klijent):
                      data={"stanje": stanje_iz(t), "token": token, "fajl_ime": "motiv.png"})
     assert r.status_code == 200, r.text[:400]
     assert "job" in r.text.lower()
+
+
+def test_kamera_panel_je_na_stranici(klijent):
+    """Nadzor sa mjesta: ziva slika stoji uz razgovor, ne na drugoj stranici."""
+    t = klijent.get("/razgovor").text
+    assert '/camera/stream' in t
+    assert "Kamera" in t
+    assert 'href="/camera"' in t
+
+
+def test_nekalibrisana_kamera_se_javlja_u_upozorenjima(klijent):
+    t = klijent.get("/razgovor").text
+    assert "Nije kalibrisana" in t or "NIJE kalibrisana" in t

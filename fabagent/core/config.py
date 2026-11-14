@@ -524,6 +524,11 @@ LASER_KERF_PO_MATERIJALU: dict[str, float] = {}
 # Granice radne povrsine se potvrdjuju na masini komandom $$ ($130 = max put X,
 # $131 = max put Y). Dok je ovo False, LASER_WORK_AREA_MM je DEKLARISANO, ne izmjereno.
 LASER_BOUNDS_CONFIRMED = False
+
+# Nakon koliko sati se kalibracija kamere smatra zastarjelom. Kamera ili laser se
+# pomjere i ne primijeti se; kalibracija koja vise ne odgovara daje lazan osjecaj
+# nadzora. Nadzor sa mjesta zavisi od toga da slika zaista pokriva radnu povrsinu.
+CAMERA_CALIBRATION_MAX_AGE_H = 24.0
 LAYER_MODES = ("Cut", "Engrave", "Score")
 LAYER_DEFAULT_MODE = {"CUT": "Cut", "ENGRAVE": "Engrave", "SCORE": "Score"}
 LAYER_SPEED_RANGE_MM_S = (1.0, GRBL_MAX_FEED_MM_MIN / 60.0)

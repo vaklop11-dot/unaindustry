@@ -423,16 +423,33 @@ def create_app(data_dir: str | None = None, camera_source: str | None = None) ->
         except Exception:
             return Rz.novo()
 
+    def kamera_stanje() -> dict:
+        """Stanje kamere za razgovor. Ne cita frejm - to bi usporilo svaku stranicu;
+        ziva slika u <img> sama pokaze radi li, a ovdje je samo kalibracija."""
+        from datetime import datetime
+        calib = calib_store.load()
+        sati = None
+        if calib is not None:
+            try:
+                kada = datetime.fromisoformat(str(calib.created))
+                sati = (datetime.now(kada.tzinfo) - kada).total_seconds() / 3600.0
+            except (ValueError, TypeError):
+                sati = None
+        return {"radi": True, "greska": None, "kalibrisana": calib is not None,
+                "kreirana": getattr(calib, "created", ""), "sati": sati,
+                "izvor": camera.describe()}
+
     def razgovor_page(request, stanje, token="", fajl_ime="", banner=None, status=200):
         from fabagent.core import razgovor as Rz
         from fabagent.core.converter import SUPPORTED_EXT
-        blokade, upozorenja = Rz.provjera_prije_starta(stanje)
+        kamera = kamera_stanje()
+        blokade, upozorenja = Rz.provjera_prije_starta(stanje, kamera)
         pitanje = Rz.sljedece_pitanje(stanje)
         ctx = {"stanje": stanje, "stanje_token": _razgovor_token(stanje),
                "token": token, "fajl_ime": fajl_ime or stanje.fajl, "banner": banner,
                "accept": ",".join(SUPPORTED_EXT), "pitanje": pitanje,
                "pitanje_tekst": Rz.tekst_pitanja(pitanje),
-               "procitano": Rz.nalog(stanje).procitano,
+               "procitano": Rz.nalog(stanje).procitano, "kamera": kamera,
                "parametri": Rz.parametri_masine(stanje), "blokade": blokade,
                "upozorenja": upozorenja, "teme": [n for n, _, _ in Rz.ZNANJE],
                "spremno": stanje.faza == "gotovo" and not blokade}
