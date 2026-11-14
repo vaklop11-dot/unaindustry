@@ -202,3 +202,10 @@ def test_upload_image_lithophane(client):
                                      "min_debljina_mm": "0.8", "filament": "PLA"},
                     files={"fajl": ("foto.png", _photo_png(), "image/png")})
     assert r.status_code == 422 and "max_debljina_mm" in r.text
+
+
+def test_masina_ima_zivu_sliku_iznad_kontrola(client):
+    """Dok laser radi gledas sliku, a Stop mora biti na istoj stranici ispod nje."""
+    t = client.get("/machine").text
+    assert "/camera/stream" in t
+    assert t.index("/camera/stream") < t.index('id="m-stop"')

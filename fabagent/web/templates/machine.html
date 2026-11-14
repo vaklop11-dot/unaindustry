@@ -22,6 +22,24 @@
         <p class="small mb-0">Stanje GRBL-a: <strong id="m-grbl">—</strong> · pozicija: <code id="m-pos">—</code></p>
       </div>
     </div>
+    {# Živa slika stola stoji iznad Pause i Stop: dok laser radi gledaš ovdje,
+       a dugme koje ga gasi je odmah ispod slike - bez ustajanja i bez druge kartice. #}
+    <div class="card mb-3">
+      <div class="card-header small fw-semibold d-flex align-items-center">
+        Radna površina uživo
+        <a class="ms-auto small" href="/camera">kalibracija</a>
+      </div>
+      <div class="card-body p-2">
+        <img src="/camera/stream" alt="živa slika radne površine" class="img-fluid rounded"
+             style="width:100%;background:#000;min-height:8rem"
+             onerror="this.style.display='none';document.getElementById('m-kam-greska').hidden=false">
+        <div id="m-kam-greska" hidden class="small text-danger mt-2 mb-0">
+          Kamera ne daje sliku. Ako laser radi, ne ostavljaj ga bez nadzora —
+          provjeri da kameru ne drži drugi program i osvježi stranicu.
+        </div>
+      </div>
+    </div>
+
     <div class="card mb-3">
       <div class="card-header small fw-semibold">Kontrole</div>
       <div class="card-body">
