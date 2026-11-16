@@ -207,3 +207,21 @@ def test_image_too_many_pixels():
 def test_corrupt_image():
     with pytest.raises(ValidationFailed):
         convert("x.png", b"\x89PNG nije slika", threshold=128, width_mm=50.0)
+
+
+# ------------------------------------------------- dodatni formati slika
+@pytest.mark.parametrize("ext", [".bmp", ".webp", ".tif", ".tiff"])
+def test_dodatni_formati_slika_prolaze(ext):
+    """OpenCV cita bmp, webp i tif bez ijedne nove biblioteke.
+
+    Operateru paketi stizu u razlicitim formatima; odbijati ih kad ih citac vec
+    razumije znaci tjerati ga da ih pretvara rukom.
+    """
+    import cv2
+    a = np.full((60, 60), 255, np.uint8)
+    a[15:45, 15:45] = 0
+    ok, buf = cv2.imencode(ext, a)
+    assert ok
+    conv = convert("crtez" + ext, buf.tobytes(), threshold=128, width_mm=50.0)
+    assert conv.source_format == "image"
+    assert b"<svg" in conv.svg

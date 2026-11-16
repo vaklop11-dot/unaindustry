@@ -24,11 +24,13 @@ from fabagent.core import config as C
 from fabagent.core.errors import InvalidParam, MissingParam, OutOfRange, RangeViolation, ValidationFailed
 
 SVG_NS = "http://www.w3.org/2000/svg"
-SUPPORTED_EXT = (".svg", ".dxf", ".pdf", ".png", ".jpg", ".jpeg")
+SUPPORTED_EXT = (".svg", ".dxf", ".pdf", ".png", ".jpg", ".jpeg",
+                 ".bmp", ".webp", ".tif", ".tiff")
 # Arhive nisu crtezi. Operater ih svejedno prilaze, jer su mu paketi stigli tako,
 # pa im treba poruka koja kaze sta da uradi - a ne "format nije podrzan".
 ARHIVA_EXT = (".zip", ".rar", ".7z", ".tar", ".gz")
-IMAGE_EXT = (".png", ".jpg", ".jpeg")
+# Sve ovo OpenCV cita bez dodatne biblioteke - provjereno zapisom i citanjem.
+IMAGE_EXT = (".png", ".jpg", ".jpeg", ".bmp", ".webp", ".tif", ".tiff")
 DXF_UNIT_CHOICES = {"mm": 1.0, "cm": 10.0, "in": C.MM_PER_IN}
 # $INSUNITS kodovi -> mm
 DXF_INSUNITS_MM = {1: C.MM_PER_IN, 2: 12 * C.MM_PER_IN, 4: 1.0, 5: 10.0, 6: 1000.0, 14: 100.0}

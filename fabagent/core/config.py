@@ -365,6 +365,10 @@ DRAWER_KNOB_HOLE_D_MM = 6.0          # rupa za rucicu fioke
 
 # Upload SVG - automatski popravak
 UPLOAD_MAX_BYTES = 10 * 1024 * 1024
+# Arhive se citaju sa diska, ne salju kroz formu. Spisak od 1000 crteza se
+# procita za oko 150 ms i na arhivi od 15 GB, jer ZIP nosi spisak na kraju.
+ARHIVA_DUBINA = 2                    # koliko nivoa podfoldera se pretrazuje za .zip
+ARHIVA_MAX_PRIKAZ = 300              # koliko unosa stane na stranicu; ostalo se suzava pretragom
 UPLOAD_JOIN_TOL_MM = 0.1             # krajevi blizi od ovoga se spajaju
 UPLOAD_DUP_TOL_MM = 0.05             # putanje koje se poklapaju unutar ovoga su duplikati
 UPLOAD_CURVE_STEP_MM = 0.2           # korak uzorkovanja krivulja (Bezier, luk)

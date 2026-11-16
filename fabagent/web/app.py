@@ -685,6 +685,74 @@ def create_app(data_dir: str | None = None, camera_source: str | None = None) ->
                                    dxf_units=(values.get("jedinice") or None) if fmt == "dxf" else None,
                                    trace=trace)
 
+    # --------------------------------------------------------- arhive (ZIP)
+    # Paketi crteza stizu kao arhive od 30 MB do 15 GB. Kroz formu za upload ne
+    # mogu proci (granica 10 MB), a raspakivanje bi zauzelo desetine gigabajta.
+    # Zato se arhiva cita SA DISKA: spisak odmah, a jedan crtez se vadi tek kad
+    # ga operater izabere. Server ionako radi na istom racunaru gdje su fajlovi.
+    def _podrazumijevani_folder() -> str:
+        dom = Path.home()
+        for ime in ("Desktop", "Radna površina", "Radna povrsina"):
+            if (dom / ime).is_dir():
+                return str(dom / ime)
+        return str(dom)
+
+    def arhiva_page(request, ctx=None, status=200):
+        from fabagent.core.converter import SUPPORTED_EXT
+        osnova = {"folder": _podrazumijevani_folder(), "arhive": [], "spisak": None,
+                  "zip": "", "trazi": "", "banner": None, "materijal": "",
+                  "accept": ", ".join(SUPPORTED_EXT), "prikazano": 0,
+                  "max_prikaz": C.ARHIVA_MAX_PRIKAZ}
+        return page(request, "arhiva.html", dict(osnova, **(ctx or {})), status)
+
+    @app.get("/arhiva", response_class=HTMLResponse)
+    def arhiva_form(request: Request, folder: str = "", zip: str = "", trazi: str = ""):
+        from fabagent.core import arhiva as AR
+        folder = folder or _podrazumijevani_folder()
+        ctx = {"folder": folder, "zip": zip, "trazi": trazi}
+        try:
+            ctx["arhive"] = AR.arhive_u_folderu(folder, dubina=C.ARHIVA_DUBINA)
+        except FabError as exc:
+            return arhiva_page(request, dict(ctx, banner=error_view(exc)[0]), HTTP_UNPROCESSABLE)
+        if zip:
+            try:
+                sp = AR.spisak(zip, trazi)
+            except FabError as exc:
+                return arhiva_page(request, dict(ctx, banner=error_view(exc)[0]), HTTP_UNPROCESSABLE)
+            ctx["prikazano"] = len(sp["unosi"])
+            sp["unosi"] = sp["unosi"][:C.ARHIVA_MAX_PRIKAZ]
+            ctx["spisak"] = sp
+        return arhiva_page(request, ctx)
+
+    @app.post("/arhiva/uzmi", response_class=HTMLResponse)
+    async def arhiva_uzmi(request: Request):
+        from fabagent.core import arhiva as AR
+        form = await request.form()
+        zip_putanja = str(form.get("zip") or "")
+        ime = str(form.get("ime") or "")
+        materijal = str(form.get("materijal") or "")
+        values = {k: str(form.get(k) or "").strip() for k in UPLOAD_VALUE_FIELDS}
+        ctx = {"zip": zip_putanja, "trazi": str(form.get("trazi") or ""),
+               "folder": str(form.get("folder") or _podrazumijevani_folder()),
+               "materijal": materijal}
+        try:
+            if not ime:
+                raise MissingParam("arhiva", ["ime"])
+            fajl, data = AR.izvadi(zip_putanja, ime)
+            job = _process_upload(fajl, data, materijal, values)
+        except FabError as exc:
+            try:
+                ctx["arhive"] = AR.arhive_u_folderu(ctx["folder"], dubina=C.ARHIVA_DUBINA)
+                sp = AR.spisak(zip_putanja, ctx["trazi"])
+                ctx["prikazano"] = len(sp["unosi"])
+                sp["unosi"] = sp["unosi"][:C.ARHIVA_MAX_PRIKAZ]
+                ctx["spisak"] = sp
+            except FabError:
+                pass
+            return arhiva_page(request, dict(ctx, banner=error_view(exc)[0]), HTTP_UNPROCESSABLE)
+        from fabagent.web.api import result_template
+        return page(request, result_template(job), preview_ctx(job))
+
     @app.post("/upload", response_class=HTMLResponse)
     async def upload(request: Request):
         form = await request.form()

@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Arhive{% endblock %}
+{% block content %}
+<h1 class="h4 mb-1">📦 Arhive (ZIP)</h1>
+<p class="text-muted small mb-3">
+  Arhiva se čita <strong>sa diska</strong> — ništa se ne kopira i ništa ne raspakuje.
+  Spisak se pročita odmah, i kod paketa od više gigabajta. Crtež se vadi tek kad ga izabereš.
+  Podržano: <code>{{ accept }}</code>. RAR i 7z se ne otvaraju — prepakuj u ZIP.
+</p>
+
+{% if banner %}{% include "partials/error_banner.html" %}{% endif %}
+
+<form method="get" action="/arhiva" class="row g-2 mb-3">
+  <div class="col-md-8">
+    <label class="form-label small mb-1">Folder u kojem su arhive</label>
+    <input class="form-control form-control-sm" name="folder" value="{{ folder }}">
+  </div>
+  <div class="col-md-4 d-flex align-items-end">
+    <button class="btn btn-outline-primary btn-sm w-100" type="submit">Pokaži arhive</button>
+  </div>
+</form>
+
+{% if arhive %}
+<div class="card mb-3">
+  <div class="card-header small fw-semibold">Arhive u folderu ({{ arhive|length }})</div>
+  <ul class="list-group list-group-flush small" style="max-height:220px; overflow:auto">
+    {% for a in arhive %}
+    <li class="list-group-item d-flex justify-content-between align-items-center
+               {% if a.putanja == zip %}active{% endif %}">
+      <a href="/arhiva?folder={{ folder|urlencode }}&zip={{ a.putanja|urlencode }}"
+         class="text-decoration-none {% if a.putanja == zip %}text-white{% endif %}">{{ a.ime }}</a>
+      <span class="text-muted {% if a.putanja == zip %}text-white{% endif %}">
+        {{ '%.1f'|format(a.bajtova / 1048576) }} MB</span>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% elif folder %}
+<p class="small text-muted">U tom folderu nema nijedne <code>.zip</code> arhive.</p>
+{% endif %}
+
+{% if spisak %}
+<div class="card">
+  <div class="card-header small fw-semibold d-flex flex-wrap gap-2 align-items-center">
+    <span>{{ spisak.arhiva }}</span>
+    <span class="text-muted">{{ spisak.podrzanih }} crteža za laser · {{ spisak.preskoceno }} ostalih preskočeno</span>
+  </div>
+  <div class="card-body">
+    <form method="get" action="/arhiva" class="row g-2 mb-3">
+      <input type="hidden" name="folder" value="{{ folder }}">
+      <input type="hidden" name="zip" value="{{ zip }}">
+      <div class="col-md-9">
+        <input class="form-control form-control-sm" name="trazi" value="{{ trazi }}"
+               placeholder="traži po imenu, npr. kutija">
+      </div>
+      <div class="col-md-3">
+        <button class="btn btn-outline-secondary btn-sm w-100" type="submit">Traži</button>
+      </div>
+    </form>
+
+    {% if prikazano > max_prikaz %}
+    <div class="alert alert-info small py-2">
+      Pogodaka: <strong>{{ prikazano }}</strong>. Prikazano prvih {{ max_prikaz }} —
+      suzi pretragu da vidiš ostale.
+    </div>
+    {% endif %}
+
+    <form method="post" action="/arhiva/uzmi">
+      <input type="hidden" name="zip" value="{{ zip }}">
+      <input type="hidden" name="folder" value="{{ folder }}">
+      <input type="hidden" name="trazi" value="{{ trazi }}">
+      <div class="row g-2 mb-3">
+        <div class="col-md-6">
+          <label class="form-label small mb-1">Materijal <span class="text-danger">*</span></label>
+          <select class="form-select form-select-sm" name="materijal" required>
+            <option value="" {% if not materijal %}selected{% endif %}>— izaberi —</option>
+            {% for m in C.LASER_MATERIALS_ALL %}
+            <option value="{{ m }}" {% if materijal == m %}selected{% endif %}>{{ L.choice_label('materijal', m) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small mb-1">Prag (samo za slike, 0–255)</label>
+          <input class="form-control form-control-sm" name="prag" placeholder="npr. 128">
+        </div>
+      </div>
+
+      <div class="list-group small" style="max-height:420px; overflow:auto">
+        {% for u in spisak.unosi %}
+        <label class="list-group-item d-flex justify-content-between align-items-center gap-2">
+          <span><input class="form-check-input me-2" type="radio" name="ime" value="{{ u.ime }}"
+                       {% if loop.first %}checked{% endif %}>{{ u.ime }}</span>
+          <span class="text-muted">{{ u.ext }} · {{ '%.0f'|format(u.bajtova / 1024) }} KB</span>
+        </label>
+        {% else %}
+        <div class="list-group-item text-muted">Nema pogotka za „{{ trazi }}".</div>
+        {% endfor %}
+      </div>
+
+      <button class="btn btn-primary mt-3" type="submit" {% if not spisak.unosi %}disabled{% endif %}>
+        Učitaj izabrani crtež
+      </button>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
