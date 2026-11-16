@@ -20,6 +20,7 @@ class PathItem:
     layer: str                      # "CUT" | "ENGRAVE" | "SCORE"
     rings: list[np.ndarray]         # zatvorene konture
     label: str = ""
+    otvorene: list[np.ndarray] = field(default_factory=list)   # linije koje se ne zatvaraju
 
     def __post_init__(self) -> None:
         if self.layer not in C.LAYERS:
@@ -36,9 +37,14 @@ class LaserDesign:
     def rings(self, layer: str) -> list[np.ndarray]:
         return [r for it in self.items if it.layer == layer for r in it.rings]
 
-    def add(self, layer: str, rings: list[np.ndarray], label: str = "") -> None:
-        if rings:
-            self.items.append(PathItem(layer, [np.asarray(r, dtype=float) for r in rings], label))
+    def otvorene(self, layer: str) -> list[np.ndarray]:
+        return [o for it in self.items if it.layer == layer for o in it.otvorene]
+
+    def add(self, layer: str, rings: list[np.ndarray], label: str = "",
+            otvorene: list[np.ndarray] | None = None) -> None:
+        ot = [np.asarray(o, dtype=float) for o in (otvorene or [])]
+        if rings or ot:
+            self.items.append(PathItem(layer, [np.asarray(r, dtype=float) for r in rings], label, ot))
 
 
 def _bbox_gap(a: np.ndarray, b: np.ndarray) -> float:

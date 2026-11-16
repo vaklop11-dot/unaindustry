@@ -32,9 +32,9 @@ def test_duplicate_lines_removed():
     res = fix_svg(_svg(SQUARE + dup + line + line.replace('x1="70"', 'x1="70.02"')))
     assert len(res.layers["CUT"]) == 1
     assert any("Uklonjeno 2 duplih" in f for f in res.report.fixes)
-    # preostala otvorena linija je blokirajuca (ne izmislja se zatvaranje)
-    assert not res.production_ready
-    assert any("otvorena putanja" in b for b in res.report.blocking)
+    # preostala otvorena linija ide u G-code kao otvoren potez, ne blokira
+    assert res.open_paths
+    assert not any("otvorena putanja" in b for b in res.report.blocking)
 
 
 def test_distinct_paths_outside_tolerance_kept():
@@ -69,8 +69,10 @@ def test_path_with_almost_closed_end_is_closed():
 
 def test_open_gap_too_large_is_blocking():
     res = fix_svg(_svg('<path d="M 10 10 L 50 10 L 50 50 L 10 50 L 10 11" fill="none" stroke="#000"/>'))
-    assert not res.production_ready
-    assert res.open_paths and "1.00 mm" in res.report.blocking[0]
+    # Otvorena linija nije greska: laser je prodje od pocetka do kraja.
+    # Zatvaranje se i dalje NE izmislja - putanja ostaje otvorena.
+    assert res.open_paths
+    assert not any("otvorena putanja" in b for b in res.report.blocking)
 
 
 def test_raster_rejected():

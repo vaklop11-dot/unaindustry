@@ -453,6 +453,7 @@ def fix_svg(data: bytes, filename: str = "upload.svg") -> FixResult:
     # --- spajanje otvorenih putanja po sloju
     final: list[_Shape] = []
     open_left: list[np.ndarray] = []
+    otvorene_po_sloju: dict[str, list] = {}
     total_joins = 0
     closed_from_open = 0
     for layer in C.LAYERS:
@@ -465,12 +466,21 @@ def fix_svg(data: bytes, filename: str = "upload.svg") -> FixResult:
         total_joins += joins
         closed_from_open += len(closed)
         final += [_Shape(layer, c, True, "spojeno") for c in closed if len(c) >= 3]
+        # Otvorena linija nije greska za laser: glava je prodje od pocetka do
+        # kraja. Zatvaranje je potrebno samo za ispunu (ENGRAVE), gdje se mora
+        # znati sta je unutra. Zato se ovdje ne blokira - linije se pamte po
+        # sloju i idu u G-code kao otvoreni potezi, bez spajanja koje bi bilo
+        # pretpostavka. Na ENGRAVE sloju se i dalje javlja, jer tamo ispuna
+        # bez zatvorene konture nije moguca.
         for o in still:
+            if len(o) < 2:
+                continue
             open_left.append(o)
-            gap = float(np.linalg.norm(o[-1] - o[0]))
-            rep.blocking.append(
-                f"{layer}: otvorena putanja od ({o[0][0]:.2f}, {o[0][1]:.2f}) do ({o[-1][0]:.2f}, {o[-1][1]:.2f}) mm "
-                f"- krajevi su {gap:.2f} mm udaljeni (> {C.UPLOAD_JOIN_TOL_MM} mm), ne moze se zatvoriti bez pretpostavke")
+            otvorene_po_sloju.setdefault(layer, []).append(o)
+        if still and layer == "ENGRAVE":
+            rep.warnings.append(
+                f"ENGRAVE: {len(still)} otvorenih putanja se ne mogu ispuniti - "
+                f"prelaze u linije (krajevi dalji od {C.UPLOAD_JOIN_TOL_MM} mm)")
     if total_joins:
         rep.fixes.append(f"Spojeno {total_joins} otvorenih linija (krajevi < {C.UPLOAD_JOIN_TOL_MM} mm)")
     if closed_from_open:
@@ -499,13 +509,14 @@ def fix_svg(data: bytes, filename: str = "upload.svg") -> FixResult:
                      "(CUT crvena, ENGRAVE crna, SCORE plava)")
     layers = {layer: [s.points for s in final if s.layer == layer] for layer in C.LAYERS}
     rep.stats["layers"] = {k: len(v) for k, v in layers.items()}
-    if not any(layers.values()):
+    if not any(layers.values()) and not any(otvorene_po_sloju.values()):
         rep.blocking.append("nakon obrade nema nijedne putanje za laser")
 
     design = LaserDesign(W, H)
     for layer in C.LAYERS:
-        if layers[layer]:
-            design.add(layer, layers[layer], layer.lower())
+        ot = otvorene_po_sloju.get(layer, [])
+        if layers[layer] or ot:
+            design.add(layer, layers[layer], layer.lower(), ot)
     if not rep.blocking:
         problems = check_design(design)
         rep.blocking += problems

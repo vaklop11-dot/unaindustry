@@ -149,13 +149,20 @@ def _order_rings(rings: list[np.ndarray], start: np.ndarray) -> list[np.ndarray]
     return out
 
 
-def _vector_layer(w: _Writer, rings: list[np.ndarray], st: LayerSetting):
+def _vector_layer(w: _Writer, rings: list[np.ndarray], st: LayerSetting,
+                  otvorene: list[np.ndarray] | None = None):
     for _ in range(st.passes):
         for ring in _order_rings(rings, w.pos):
             w.g0(ring[0])
             for p in ring[1:]:
                 w.g1(p, st.s_value, st.feed)
             w.g1(ring[0], st.s_value, st.feed)      # zatvori konturu
+        # Otvorene linije se prolaze od pocetka do kraja i tu se staje. Vracanje
+        # na pocetak bi izgorjelo isti potez dva puta.
+        for linija in _order_rings(list(otvorene or []), w.pos):
+            w.g0(linija[0])
+            for p in linija[1:]:
+                w.g1(p, st.s_value, st.feed)
 
 
 def scanline_spans(rings: list[np.ndarray], y: float) -> list[tuple[float, float]]:
@@ -202,7 +209,8 @@ class GcodeResult:
 
 def _check_bounds(design, ox: float, oy: float) -> None:
     W, H = C.LASER_WORK_AREA_MM
-    rings = [r for it in design.items for r in it.rings]
+    rings = ([r for it in design.items for r in it.rings]
+             + [o for it in design.items for o in it.otvorene])
     if not rings:
         raise InvalidGeometry("dizajn nema nijednu putanju", "gcode")
     x0, y0, x1, y1 = g2.bbox(rings)
@@ -215,6 +223,38 @@ def _check_bounds(design, ox: float, oy: float) -> None:
             f"{W:g} x {H:g} mm (ukljucujuci prelet {over:g} mm kod graviranja)")])
 
 
+def _kljuc_putanje(r, rez_mm: float = 0.05) -> tuple:
+    """Otisak putanje neosjetljiv na pocetnu tacku i smjer obilaska.
+
+    Rasterizuje se na 0.05 mm, pa dvije putanje koje se poklapaju unutar te
+    tolerancije daju isti kljuc. Koristi se da se ista geometrija ne izgori
+    dva puta (CorelDRAW izvozi liniju i kao .fil i kao .str).
+    """
+    t = [(round(float(x) / rez_mm), round(float(y) / rez_mm)) for x, y in r]
+    if len(t) > 1 and t[0] == t[-1]:
+        t = t[:-1]
+    if not t:
+        return ()
+    n = len(t)
+    k = min(range(n), key=lambda i: t[i])
+    napr = tuple(t[(k + i) % n] for i in range(n))
+    nazad = tuple(t[(k - i) % n] for i in range(n))
+    return min(napr, nazad)
+
+
+def _bez_duplih(rings, vec_izgorene: set) -> list:
+    """Izbacuje putanje koje su vec izgorene u nekom ranijem sloju ili ranije
+    u istom sloju. Bez ovoga laser dva puta prelazi preko iste linije."""
+    ostaju = []
+    for r in rings:
+        k = _kljuc_putanje(r)
+        if not k or k in vec_izgorene:
+            continue
+        vec_izgorene.add(k)
+        ostaju.append(r)
+    return ostaju
+
+
 def generate(design, settings: dict[str, LayerSetting], offset: tuple[float, float], title: str = "") -> GcodeResult:
     ox, oy = offset
     _check_bounds(design, ox, oy)
@@ -224,9 +264,18 @@ def generate(design, settings: dict[str, LayerSetting], offset: tuple[float, flo
                 f"; pomak dizajna na stolu: X{ox:g} Y{oy:g} mm (gornji lijevi ugao dokumenta)",
                 "G21 ; mm", "G90 ; apsolutno", "M5", f"{C.GRBL_LASER_MODE_CMD} S0"]
     used = []
+    izgorene: set = set()
+    preskoceno = 0
     for layer in C.LAYER_EXECUTION_ORDER:
         rings = design.rings(layer)
-        if not rings:
+        otvorene = design.otvorene(layer)
+        if not rings and not otvorene:
+            continue
+        prije = len(rings) + len(otvorene)
+        rings = _bez_duplih(rings, izgorene)
+        otvorene = _bez_duplih(otvorene, izgorene)
+        preskoceno += prije - len(rings) - len(otvorene)
+        if not rings and not otvorene:
             continue
         st = settings[layer]
         used.append(layer)
@@ -234,11 +283,17 @@ def generate(design, settings: dict[str, LayerSetting], offset: tuple[float, flo
                        f"{st.passes} prolaz(a)" + (f", interval {st.interval_mm:g} mm" if st.mode == "Engrave" else ""))
         if st.mode == "Engrave":
             _fill_layer(w, rings, st)
+            if otvorene:
+                _vector_layer(w, [], st, otvorene)
         else:
-            _vector_layer(w, rings, st)
+            _vector_layer(w, rings, st, otvorene)
+    if preskoceno:
+        w.lines.insert(5, f"; preskoceno {preskoceno} duplih putanja "
+                          f"(ista geometrija vec izgorena)")
     w.lines += ["M5 ; laser ugasen", "G0 X0 Y0", "M2"]
     travel_s = w.travel_mm / (C.GRBL_TRAVEL_FEED_MM_MIN / 60.0)
     stats = {"lines": len(w.lines), "layers": used, "burn_mm": round(w.burn_mm, 1),
+             "duple_preskocene": preskoceno,
              "travel_mm": round(w.travel_mm, 1), "time_s": round(w.burn_s + travel_s, 1),
              "offset_mm": [ox, oy], "settings": {k: settings[k].as_dict() for k in used}}
     return GcodeResult("\n".join(w.lines) + "\n", stats)
