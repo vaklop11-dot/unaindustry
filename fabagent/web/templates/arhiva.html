@@ -79,11 +79,20 @@
             {% endfor %}
           </select>
         </div>
-        <div class="col-md-6">
-          <label class="form-label small mb-1">Prag (samo za slike, 0–255)</label>
+        <div class="col-md-3">
+          <label class="form-label small mb-1">Sirina u mm (za slike)</label>
+          <input class="form-control form-control-sm" name="sirina_mm"
+                 value="{{ sirina_mm or '' }}" placeholder="npr. 120">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small mb-1">Prag (slike, 0–255)</label>
           <input class="form-control form-control-sm" name="prag" placeholder="npr. 128">
         </div>
       </div>
+      <p class="text-secondary small mb-3">
+        PNG i JPG nemaju mjeru u sebi, pa se sirina mora zadati - bez nje se ne pogadja.
+        Za .svg, .dxf i .pdf se ne popunjava.
+      </p>
 
       <div class="list-group small" style="max-height:420px; overflow:auto">
         {% for u in spisak.unosi %}

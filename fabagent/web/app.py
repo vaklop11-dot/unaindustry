@@ -734,7 +734,7 @@ def create_app(data_dir: str | None = None, camera_source: str | None = None) ->
         values = {k: str(form.get(k) or "").strip() for k in UPLOAD_VALUE_FIELDS}
         ctx = {"zip": zip_putanja, "trazi": str(form.get("trazi") or ""),
                "folder": str(form.get("folder") or _podrazumijevani_folder()),
-               "materijal": materijal}
+               "materijal": materijal, "sirina_mm": values.get("sirina_mm", "")}
         try:
             if not ime:
                 raise MissingParam("arhiva", ["ime"])
