@@ -25,6 +25,7 @@ from fabagent.core import config as C                      # noqa: E402
 from fabagent.core import gcode as G                       # noqa: E402
 from fabagent.core.converter import dxf_to_svg             # noqa: E402
 from fabagent.core.svg_fixer import fix_svg                # noqa: E402
+from fabagent.laser import dijeljenje as DJ                 # noqa: E402
 from fabagent.laser.presets import get_preset               # noqa: E402
 
 
@@ -56,33 +57,47 @@ def _postavke(materijal: str) -> dict:
     return izbor
 
 
-def obradi_dxf(ime: str, podaci: bytes, materijal: str, izlaz: Path) -> dict:
-    red = {"fajl": ime, "status": "", "putanja_nc": "", "duple": 0, "poruka": ""}
+def obradi_dxf(ime: str, podaci: bytes, materijal: str, izlaz: Path, dijeli: bool) -> dict:
+    red = {"fajl": ime, "status": "", "duple": 0, "poruka": ""}
     try:
         konv = dxf_to_svg(podaci, "mm")
         popravljen = fix_svg(konv.svg, ime)
-        dizajn = popravljen.design
-        if dizajn is None:
-            red["status"] = "PAD"
-            red["poruka"] = "; ".join(popravljen.report.blocking) or "crtez nije upotrebljiv"
-            return red
         post = _postavke(materijal)
-        nedostaje = [s for s in {it.layer for it in dizajn.items} if s not in post]
-        if nedostaje:
-            red["status"] = "PRESKOCENO"
-            red["poruka"] = f"preset '{materijal}' nema sloj: {', '.join(sorted(nedostaje))}"
+        W, H = float(C.LASER_WORK_AREA_MM[0]), float(C.LASER_WORK_AREA_MM[1])
+
+        otv: dict[str, list] = {}
+        for o in popravljen.open_paths or []:
+            otv.setdefault("CUT", []).append(o)
+
+        if popravljen.design is not None and not dijeli:
+            table = [None]
+            prevelici = []
+        else:
+            lista = DJ.komadi(popravljen.layers, otv)
+            table, prevelici = DJ.rasporedi(lista, W, H)
+
+        if not table:
+            red["status"] = "PAD"
+            red["poruka"] = "nijedan komad ne stane na radnu povrsinu"
             return red
-        rez = G.generate(dizajn, post, (0.0, 0.0), title=ime)
-        nc = izlaz / (Path(ime).stem + ".nc")
-        nc.write_text(rez.gcode, encoding="utf-8")
+
+        napisano = []
+        for i, tabla in enumerate(table, 1):
+            d = popravljen.design if tabla is None else DJ.dizajn_table(tabla, W, H)
+            rez = G.generate(d, post, (0.0, 0.0), title=f"{ime} dio {i}")
+            nc = izlaz / (Path(ime).stem + (f"_dio{i}.nc" if len(table) > 1 else ".nc"))
+            nc.write_text(rez.text, encoding="utf-8")
+            napisano.append(nc.name)
+            red["duple"] += int(rez.stats.get("duple_preskocene", 0))
+
         red["status"] = "OK"
-        red["putanja_nc"] = str(nc)
-        red["duple"] = int(rez.stats.get("duple_preskocene", 0))
-        red["poruka"] = (f"{rez.stats['burn_mm']:.0f} mm reza, "
-                         f"{rez.stats['time_s'] / 60:.1f} min, slojevi: {','.join(rez.stats['layers'])}")
+        red["poruka"] = f"{len(napisano)} tabla/i: {', '.join(napisano)}"
+        if prevelici:
+            red["poruka"] += (f" | {len(prevelici)} komad(a) ne stane ni sam: "
+                              + ", ".join(f"{k.sirina:.0f}x{k.visina:.0f}mm" for k in prevelici[:3]))
     except Exception as exc:
         red["status"] = "PAD"
-        red["poruka"] = f"{type(exc).__name__}: {exc}"
+        red["poruka"] = f"{type(exc).__name__}: {str(exc)[:120]}"
     return red
 
 
@@ -92,6 +107,8 @@ def main() -> int:
     a.add_argument("--materijal", default="sperploca_3mm", help="kljuc iz presets.py")
     a.add_argument("--izlaz", default="izlaz/dxf_paket", help="folder za .nc fajlove")
     a.add_argument("--samo", default="", help="obradi samo fajlove ciji naziv sadrzi ovaj tekst")
+    a.add_argument("--bez-dijeljenja", action="store_true",
+                   help="ne dijeli preveliki crtez na table (tada preveliki pada)")
     arg = a.parse_args()
 
     p = Path(arg.putanja)
@@ -118,12 +135,12 @@ def main() -> int:
         print(f"\n== {zp.name}  ({len(unosi)} DXF)")
         for ime, podaci in unosi:
             ukupno += 1
-            r = obradi_dxf(ime, podaci, arg.materijal, izlaz)
+            r = obradi_dxf(ime, podaci, arg.materijal, izlaz, not arg.bez_dijeljenja)
             duplih += r["duple"]
             if r["status"] == "OK":
                 ok += 1
                 dup = f"  [duplih izbaceno: {r['duple']}]" if r["duple"] else ""
-                print(f"   OK         {ime}  ->  {Path(r['putanja_nc']).name}  {r['poruka']}{dup}")
+                print(f"   OK         {ime}  ->  {r['poruka']}{dup}")
             elif r["status"] == "PRESKOCENO":
                 preskocen += 1
                 print(f"   PRESKOCENO {ime}  {r['poruka']}")
