@@ -8,6 +8,7 @@ import pytest
 
 from fabagent.core import config as C
 from fabagent.core import geometry2d as g2
+from fabagent.core import converter
 from fabagent.core.converter import convert, detect_format
 from fabagent.core.errors import InvalidParam, MissingParam, OutOfRange, ValidationFailed
 from fabagent.core.svg_fixer import fix_svg
@@ -225,3 +226,33 @@ def test_dodatni_formati_slika_prolaze(ext):
     conv = convert("crtez" + ext, buf.tobytes(), threshold=128, width_mm=50.0)
     assert conv.source_format == "image"
     assert b"<svg" in conv.svg
+
+
+def _dxf_sa_splineom(zatvoren: bool) -> bytes:
+    """DXF u kojem je jedini sadrzaj SPLINE - tako izgledaju vektorski paketi
+    za laser (CorelDraw/Illustrator izvoz). Prije podrske za SPLINE takav je
+    fajl padao sa porukom da je prazan."""
+    import ezdxf
+    doc = ezdxf.new(setup=False)
+    doc.header["$INSUNITS"] = 4          # mm
+    tacke = [(0, 0), (20, 30), (50, 30), (70, 0)]
+    if zatvoren:
+        doc.modelspace().add_spline(tacke, dxfattribs={"flags": 1})
+    else:
+        doc.modelspace().add_spline(tacke)
+    t = io.StringIO()
+    doc.write(t)
+    return t.getvalue().encode("utf-8")
+
+
+def test_dxf_sa_samim_splineom_daje_putanju():
+    c = converter.dxf_to_svg(_dxf_sa_splineom(False), units="mm")
+    assert b"<path" in c.svg
+    assert not c.blocking
+    assert any("1 putanja" in n or "putanja" in n for n in c.notes)
+
+
+def test_dxf_zatvoren_spline_je_zatvorena_kontura():
+    c = converter.dxf_to_svg(_dxf_sa_splineom(True), units="mm")
+    assert b"<path" in c.svg
+    assert b"Z" in c.svg or b"z" in c.svg

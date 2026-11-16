@@ -1,6 +1,7 @@
 """Konverzija DXF / PDF / PNG / JPG -> SVG, nakon cega SVG obavezno ide kroz svg_fixer.
 
-  * DXF  (ezdxf):   LINE, CIRCLE, ARC, LWPOLYLINE (sa bulge), POLYLINE, ELLIPSE + INSERT
+  * DXF  (ezdxf):   LINE, CIRCLE, ARC, LWPOLYLINE (sa bulge), POLYLINE, ELLIPSE,
+                    SPLINE + INSERT
                     (blokovi se razgradjuju). Jedinice iz $INSUNITS; ako ih nema, korisnik ih
                     mora zadati (nema pretpostavke). Ostali entiteti (TEXT, HATCH, SPLINE...)
                     -> blokirajuca greska, ne gube se tiho.
@@ -35,7 +36,7 @@ DXF_UNIT_CHOICES = {"mm": 1.0, "cm": 10.0, "in": C.MM_PER_IN}
 # $INSUNITS kodovi -> mm
 DXF_INSUNITS_MM = {1: C.MM_PER_IN, 2: 12 * C.MM_PER_IN, 4: 1.0, 5: 10.0, 6: 1000.0, 14: 100.0}
 DXF_INSUNITS_NAMES = {1: "in", 2: "ft", 4: "mm", 5: "cm", 6: "m", 14: "dm"}
-DXF_SUPPORTED = {"LINE", "CIRCLE", "ARC", "LWPOLYLINE", "POLYLINE", "ELLIPSE"}
+DXF_SUPPORTED = {"LINE", "CIRCLE", "ARC", "LWPOLYLINE", "POLYLINE", "ELLIPSE", "SPLINE"}
 
 
 @dataclass
@@ -121,7 +122,10 @@ def dxf_to_svg(data: bytes, units: str | None = None) -> Conversion:
             return
         pts = _entity_points(e, g2)
         if pts is not None:
-            polylines.append((pts, t == "CIRCLE" or (t == "ELLIPSE" and _full_ellipse(e))))
+            zatvorena = (t == "CIRCLE"
+                         or (t == "ELLIPSE" and _full_ellipse(e))
+                         or (t == "SPLINE" and _spline_zatvoren(e, pts)))
+            polylines.append((pts, zatvorena))
 
     for e in doc.modelspace():
         emit(e)
@@ -169,6 +173,13 @@ def _full_ellipse(e) -> bool:
     return abs((e.dxf.end_param - e.dxf.start_param) - 2 * math.pi) < 1e-9
 
 
+def _spline_zatvoren(e, pts: np.ndarray) -> bool:
+    """SPLINE je zatvoren ako ga DXF tako oznacava ili ako mu se krajevi poklapaju."""
+    if bool(getattr(e, "closed", False)):
+        return True
+    return len(pts) > 2 and float(np.linalg.norm(pts[0] - pts[-1])) < C.GEOMETRY_EPS_MM
+
+
 def _entity_points(e, g2) -> np.ndarray | None:
     t = e.dxftype()
     if t == "LINE":
@@ -186,6 +197,18 @@ def _entity_points(e, g2) -> np.ndarray | None:
         n = max(C.ARC_MIN_SEGMENTS, g2.arc_segments(e.dxf.major_axis.magnitude))
         pts = np.array([[v.x, v.y] for v in e.flattening(C.ARC_CHORD_TOLERANCE_MM, segments=n)], float)
         return pts[:-1] if _full_ellipse(e) and len(pts) > 2 else pts
+    if t == "SPLINE":
+        # Krive se razlazu na duzi sa istom tolerancijom tetive kao lukovi, pa
+        # dalje idu kroz isti popravak kao svaka druga polilinija. Vektorski
+        # paketi za laser (DXF iz CorelDraw-a i Illustratora) cesto nemaju nista
+        # osim SPLINE-a, pa bez ovoga takav crtez izgleda kao prazan fajl.
+        pts = np.array([[v.x, v.y] for v in e.flattening(C.ARC_CHORD_TOLERANCE_MM)], float)
+        if len(pts) < 2:
+            return None
+        if (_spline_zatvoren(e, pts) and len(pts) > 2
+                and float(np.linalg.norm(pts[0] - pts[-1])) < C.GEOMETRY_EPS_MM):
+            pts = pts[:-1]
+        return pts
     return None
 
 
