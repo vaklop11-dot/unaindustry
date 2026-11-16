@@ -101,10 +101,10 @@ def test_frame_is_laser_off_only():
 
 def test_layer_settings_validation_and_preset():
     pre = preset_layer_settings(PRESETS["sperploca_3mm"])
-    assert set(pre) == {"CUT", "ENGRAVE", "SCORE"} and pre["ENGRAVE"]["interval_mm"] == 0.1
+    assert set(pre) == {"CUT", "ENGRAVE", "SCORE"} and pre["ENGRAVE"]["interval_mm"] == 0.2   # IZMJERENO 15.11.2026
     assert "CUT" not in preset_layer_settings(PRESETS["eloksirani_aluminij"])
     ok = parse_layer_settings(pre, ["CUT", "ENGRAVE"])
-    assert ok["CUT"].s_value == 1000
+    assert ok["CUT"].s_value == 350      # 35 % od S max 1000, IZMJERENO 15.11.2026
     with pytest.raises(MissingParam):
         parse_layer_settings({"CUT": {"mode": "Cut", "speed_mm_s": 5}}, ["CUT"])
     with pytest.raises(OutOfRange):

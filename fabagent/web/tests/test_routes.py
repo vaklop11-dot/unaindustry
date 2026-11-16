@@ -150,7 +150,7 @@ def test_laser_preview_and_approve(client):
     assert job["preset"] == "sperploca_3mm" and job["preset_verified"] is False
     assert job["estimates"]["vrijeme_s"] > 0 and job["estimates"]["masa_g"] is None
     assert sorted(job["outputs"]) == sorted(p.name for p in prod[0].iterdir() if p.name != "job.json")
-    assert any("NIJE verifikovan" in w for w in job["warnings"])
+    assert any("nije mjereno na" in w for w in job["warnings"]), job["warnings"]
 
     # drugo odobravanje istog joba ne pravi duplikat
     client.post("/laser/privesak/approve", data={"job_id": job_id})

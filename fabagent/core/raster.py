@@ -137,10 +137,27 @@ def raster_gcode(pmap: np.ndarray, interval_mm: float, speed_mm_s: float, power_
     ox, oy = offset
     over = C.ENGRAVE_OVERSCAN_MM
     width, height = nx * interval_mm, ny * interval_mm
-    if ox - over < 0 or oy < 0 or ox + width + over > W or oy + height > H:
-        raise OOR("pozicija", [RangeViolation("pozicija", 0, None, None, "mm",
-                                              f"slika {width:.1f}x{height:.1f} mm na X{ox:g} Y{oy:g} izlazi "
-                                              f"izvan radne povrsine {W:g}x{H:g} mm (prelet {over:g} mm)")])
+    # Prelet je zalet glave prije i poslije svake linije popune: dioda je ugasena,
+    # ali glava mora fizicki izaci van slike. Zato X ne smije biti manji od preleta
+    # ni blizi desnoj ivici od preleta - u Y preleta nema.
+    # Ranije je poruka glasila "pozicija=0 izvan opsega [-inf, +inf]" i operater iz
+    # nje nije mogao znati ni koji broj je los ni koji da upise.
+    x_min, x_max = over, W - width - over
+    y_min, y_max = 0.0, H - height
+    if x_max < x_min or y_max < y_min:
+        raise OOR("pozicija", [RangeViolation(
+            "slika", max(width, height), None, None, "mm",
+            f"slika {width:.1f}x{height:.1f} mm ne staje na radnu povrsinu "
+            f"{W:g}x{H:g} mm ni u jednom polozaju (prelet {over:g} mm sa svake strane)")])
+    if not (x_min <= ox <= x_max):
+        raise OOR("X", [RangeViolation(
+            "X", ox, round(x_min, 1), round(x_max, 1), "mm",
+            f"slika je siroka {width:.1f} mm, a glava uzima jos {over:g} mm preleta sa "
+            f"svake strane; upisi X izmedju {x_min:.1f} i {x_max:.1f} mm")])
+    if not (y_min <= oy <= y_max):
+        raise OOR("Y", [RangeViolation(
+            "Y", oy, round(y_min, 1), round(y_max, 1), "mm",
+            f"slika je visoka {height:.1f} mm; upisi Y izmedju {y_min:.1f} i {y_max:.1f} mm")])
     smax = power_pct / 100.0 * C.GRBL_S_MAX
     S = np.round(pmap * smax).astype(int)
     feed = speed_mm_s * 60.0

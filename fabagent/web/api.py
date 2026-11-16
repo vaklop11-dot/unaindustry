@@ -222,9 +222,23 @@ def register(app, store, page, error_view, preview_ctx) -> None:
 
     @app.get("/machine", response_class=HTMLResponse)
     def machine_page(request: Request, job: str = ""):
+        """Bez ?job= uzmi najnoviji laserski posao.
+
+        Ranije je "Laser" u meniju vodio na prazan ekran: posao napravljen u
+        razgovoru ostajao je na svojoj stranici, a ovdje su Frame i Start bili
+        iskljuceni bez objasnjenja. Operater koji stoji uz masinu ne smije
+        traziti svoj posao po spisku - zadnji napravljen je skoro uvijek taj.
+        """
         rec = store.get(job) if job else None
+        sam_izabrao = False
+        if rec is None:
+            laserski = [j for j in store.list() if store.is_laser_job(j)]
+            if laserski:
+                rec = store.get(laserski[0]["job_id"])
+                sam_izabrao = True
         ctx = {"job": rec, "baud": C.GRBL_BAUD_RATE, "home_cmd": C.GRBL_HOME_CMD,
-               "bed": C.LASER_WORK_AREA_MM, "origin": C.MACHINE_ORIGIN}
+               "bed": C.LASER_WORK_AREA_MM, "origin": C.MACHINE_ORIGIN,
+               "sam_izabrao": sam_izabrao}
         if rec is not None:
             if not store.is_laser_job(rec):
                 raise OutputError(f"job {job} nije laserski")

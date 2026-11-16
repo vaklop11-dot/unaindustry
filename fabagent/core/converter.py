@@ -25,6 +25,9 @@ from fabagent.core.errors import InvalidParam, MissingParam, OutOfRange, RangeVi
 
 SVG_NS = "http://www.w3.org/2000/svg"
 SUPPORTED_EXT = (".svg", ".dxf", ".pdf", ".png", ".jpg", ".jpeg")
+# Arhive nisu crtezi. Operater ih svejedno prilaze, jer su mu paketi stigli tako,
+# pa im treba poruka koja kaze sta da uradi - a ne "format nije podrzan".
+ARHIVA_EXT = (".zip", ".rar", ".7z", ".tar", ".gz")
 IMAGE_EXT = (".png", ".jpg", ".jpeg")
 DXF_UNIT_CHOICES = {"mm": 1.0, "cm": 10.0, "in": C.MM_PER_IN}
 # $INSUNITS kodovi -> mm
@@ -46,6 +49,12 @@ class Conversion:
 
 def detect_format(filename: str) -> str:
     ext = Path(filename).suffix.lower()
+    if ext in ARHIVA_EXT:
+        mb = C.UPLOAD_MAX_BYTES // (1024 * 1024)
+        raise InvalidParam(
+            f"fajl: '{ext}' je arhiva, a ne crtez. Raspakuj je i prilozi jedan fajl iz nje "
+            f"({', '.join(SUPPORTED_EXT)}). Arhive se kroz ovu formu ne mogu ni poslati - "
+            f"granica je {mb} MB, a paketi su po vise stotina MB.")
     if ext not in SUPPORTED_EXT:
         raise InvalidParam(f"fajl: format '{ext or '?'}' nije podrzan; dozvoljeno: {', '.join(SUPPORTED_EXT)}")
     return "jpg" if ext == ".jpeg" else ext[1:]

@@ -91,8 +91,15 @@ def build(template: str, raw_params: dict, use_defaults: bool = False,
     preset = get_preset(params["materijal"])
     log.record("preset", f"materijal '{preset.key}' ({preset.name})", **{
         k: v for k, v in preset.as_dict().items() if k in ("CUT", "ENGRAVE", "SCORE")})
-    if not preset.verified:
-        log.warn(f"preset '{preset.key}' NIJE verifikovan na masini - uradi test-grid prije produkcije")
+    # Upozorenje imenuje samo ono sto stvarno nije mjereno. Materijal moze imati
+    # gravuru i rez sa test-mreze, a ucrtavanje jos na polaznoj vrijednosti.
+    nemjereno = [ime for ime, op in (("rez", preset.cut),
+                                     ("gravura", preset.engrave),
+                                     ("ucrtavanje", preset.score))
+                 if op is not None and not getattr(op, "izmjereno", False)]
+    if nemjereno:
+        log.warn(f"preset '{preset.key}': {', '.join(nemjereno)} nije mjereno na "
+                 f"ovoj masini - uradi test-grid prije serije")
     log.record("granice", "pravila lasera",
                min_zid_mm=C.LASER_MIN_WALL_MM, min_rupa_mm=C.LASER_MIN_HOLE_DIAMETER_MM,
                razmak_cut_engrave_mm=C.CUT_ENGRAVE_CLEARANCE_MM, radna_povrsina_mm=C.LASER_WORK_AREA_MM)

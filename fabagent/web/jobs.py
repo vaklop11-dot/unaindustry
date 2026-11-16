@@ -172,8 +172,17 @@ class JobStore:
         log.record("upload", f"fajl '{filename}' ({len(data)} B), materijal '{materijal}'", **rep.stats)
         for f in rep.fixes:
             log.record("popravak", f)
-        if not preset.verified:
-            log.warn(f"preset '{preset.key}' NIJE verifikovan na masini - uradi test-grid prije produkcije")
+        # Upozorenje se gradi po slojevima koje preset stvarno ima, a ne po jednoj
+        # zastavici: gravura i rez mogu biti izmjereni test-mrezom dok ucrtavanje
+        # nije. Jedna zajednicka poruka tada vice na posao koji je izmjeren, pa je
+        # operater prestane citati - a to je gore nego da je nema.
+        nemjereno = [ime for ime, op in (("rez", preset.cut),
+                                         ("gravura", preset.engrave),
+                                         ("ucrtavanje", preset.score))
+                     if op is not None and not getattr(op, "izmjereno", False)]
+        if nemjereno:
+            log.warn(f"preset '{preset.key}': {', '.join(nemjereno)} nije mjereno na "
+                     f"ovoj masini - uradi test-grid prije serije")
         warnings = rep.warnings + log.warnings
 
         now = _now()
@@ -442,7 +451,11 @@ class JobStore:
         except Exception:
             shutil.rmtree(job_dir, ignore_errors=True)
             raise
-        warnings = [] if preset.verified else [
+        # Rasterski posao koristi SAMO sloj ENGRAVE, pa ga i ocjenjuje po njemu.
+        # Materijal u cjelini moze biti neverifikovan zbog reza, a gravura ipak
+        # izmjerena test-mrezom - tada upozorenje na gravuru ne stoji.
+        gravura_mjerena = bool(getattr(preset.engrave, "izmjereno", False))
+        warnings = [] if (preset.verified or gravura_mjerena) else [
             f"preset '{preset.key}' NIJE verifikovan na masini - uradi test-grid prije produkcije"]
         rec = {
             "job_id": job_id, "created": now.isoformat(), "type": "raster", "template": "slika_raster",
@@ -451,7 +464,8 @@ class JobStore:
             "params_raw": {k: v for k, v in raw.items() if v not in (None, "")}, "params_defaulted": [],
             "outputs": [png_name, json_name], "renders": [], "sources": [f"izvor{ext}"],
             "raster": {"pixels": [nx, ny], "interval_mm": interval, "png": png_name},
-            "preset": preset.key, "preset_name": preset.name, "preset_verified": preset.verified,
+            "preset": preset.key, "preset_name": preset.name,
+            "preset_verified": preset.verified or gravura_mjerena,
             "warnings": warnings, "notes": notes,
             "estimates": {"vrijeme_s": t, "masa_g": None},
             "summary": {"document_mm": {"width": round(nx * interval, 3), "height": round(ny * interval, 3)},

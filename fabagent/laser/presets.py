@@ -22,12 +22,17 @@ class OpSetting:
     power_pct: float
     passes: int = 1
     line_interval_mm: float | None = None   # samo za fill graviranje
+    izmjereno: bool = False                 # True = brojevi su sa test-mreze na OVOJ masini
+    mjereno_kada: str = ""                  # datum mjerenja, prazno ako nije mjereno
 
     def as_dict(self) -> dict:
         d = {"speed_mm_s": self.speed_mm_s, "speed_mm_min": self.speed_mm_s * 60,
-             "power_pct": self.power_pct, "passes": self.passes}
+             "power_pct": self.power_pct, "passes": self.passes,
+             "izmjereno": self.izmjereno}
         if self.line_interval_mm is not None:
             d["line_interval_mm"] = self.line_interval_mm
+        if self.mjereno_kada:
+            d["mjereno_kada"] = self.mjereno_kada
         return d
 
 
@@ -61,11 +66,21 @@ PRESETS: dict[str, MaterialPreset] = {
     p.key: p
     for p in (
         MaterialPreset(
+            # GRAVURA: izmjereno test-mrezom na ovoj masini 15.11.2026 (vidi mjerenja.py).
+            # 10000 mm/min = 166.667 mm/s, 80 % - prvi red mreze gdje je obloga
+            # skinuta do kraja, sa 90 i 100 kao rezervom iznad.
+            # REZ i SCORE: jos polazne vrijednosti. Mreza reza postoji, ali snaga na
+            # kojoj je radjena nije zapisana, pa se brojevi ne izmisljaju.
             "sperploca_3mm", "Sperploca (breza/lipa) 3 mm", 3.0,
-            cut=OpSetting(8.0, 100, 1),
-            engrave=OpSetting(100.0, 30, 1, 0.1),
+            cut=OpSetting(250.0 / 60.0, 35, 2,
+                          izmjereno=True, mjereno_kada="15.11.2026"),
+            engrave=OpSetting(10000.0 / 60.0, 80, 1, 0.2,
+                              izmjereno=True, mjereno_kada="15.11.2026"),
             score=OpSetting(40.0, 25, 1),
-            verified=False, note="Polazna vrijednost. Ljepilo u sperploci varira - test obavezan.",
+            verified=False,
+            note="Gravura i rez IZMJERENI na ovoj masini 15.11.2026 test-mrezama. "
+                 "Rez: 250 mm/min, 35 %, 2 prolaza - najmanji broj prolaza koji je "
+                 "presjekao plocu. Ucrtavanje (SCORE) nije mjereno.",
         ),
         MaterialPreset(
             "mdf_3mm", "MDF 3 mm", 3.0,

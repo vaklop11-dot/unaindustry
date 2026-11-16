@@ -391,6 +391,29 @@ def _znanje_bez_mreze(stanje: Stanje) -> str:
             "podatka nema, kazem NEMA PODATKA.")
 
 
+def _znanje_mjerenja(stanje: Stanje) -> str:
+    """Sto je stvarno izmjereno na ovoj masini, i sto jos fali."""
+    try:
+        from fabagent.laser import mjerenja as M
+    except Exception:                              # noqa: BLE001
+        return "Nemam zapisano nijedno mjerenje sa ove masine."
+    g = M.gravura_izbor()
+    red = [f"Test-mreza je radjena {M.DATUM} na materijalu '{M.MATERIJAL}'.",
+           f"Gravura, mreza 5x5: brzine {', '.join(str(b) for b in M.GRAVURA_BRZINE_MM_MIN)} mm/min "
+           f"x snage {', '.join(str(p) for p in M.GRAVURA_SNAGE_PCT)} %.",
+           f"Izabrano: {g['brzina_mm_min']:g} mm/min ({g['brzina_mm_s']:.1f} mm/s), "
+           f"{g['snaga_posto']} %, {g['prolaza']} prolaz. {g['zasto']}",
+           f"Rez, mreza prolaza: {M.rez_tabela_teksta()}."]
+    if M.REZ_SNAGA_PCT is None:
+        red.append("Snaga na kojoj je mreza REZA radjena nije zapisana, pa rez i dalje "
+                   "ide na polaznu vrijednost. Reci tu snagu i upisujem je.")
+    if M.GRAVURA_RAZMAK_IZABRAN_MM is None:
+        testirano = " i ".join(f"{v:g}" for v in M.GRAVURA_RAZMAK_TESTIRAN_MM)
+        red.append(f"Razmak linija je testiran na {testirano} mm; koji je bolji ispao "
+                   "nije zapisano, pa preset nosi 0.2 mm. Reci ako je 0.3.")
+    return " ".join(red)
+
+
 ZNANJE = (
     ("razmak linija / DPI", ("razmak", "interval", "dpi", "gustina linij", "linija po"),
      _znanje_razmak),
@@ -416,8 +439,11 @@ ZNANJE = (
                          "vidim sto", "snimak", "kalibracij"), _znanje_kamera),
     ("gdje smo", ("gdje smo", "sta sad", "sta dalje", "sta imamo", "sta je ostalo",
                   "dokle smo", "rekapitulacij"), _znanje_gdje_smo),
-    ("rad bez mreze", ("internet", "mrez", "api", "kljuc", "offline", "off grid",
+    ("rad bez mreze", ("internet", "api", "kljuc", "offline", "off grid",
                        "model", "oblak", "cloud"), _znanje_bez_mreze),
+    ("test-mreza i mjerenja", ("test mrez", "test-mrez", "mjerenj", "izmjeren", "test grid",
+                               "testgrid", "mreza snage", "sta je mjereno", "sta si mjerio"),
+     _znanje_mjerenja),
 )
 
 
@@ -497,7 +523,18 @@ def _pitanje_masine(n: A.Nalog, stanje: Stanje) -> dict | None:
             continue
         iz_preseta = _postavke_preseta(n, sloj)
         p = _preset(n)
-        provjereno = bool(p.verified) if p else False
+        op = None
+        if p is not None:
+            try:
+                op = p.setting(sloj)
+            except Exception:                      # noqa: BLE001
+                op = None
+        # Mjerenje se vodi po sloju, ne po materijalu: gravura moze biti izmjerena
+        # test-mrezom dok rez na istom materijalu jos stoji na polaznoj vrijednosti.
+        # Jedna zajednicka zastavica bi ili lagala za rez ili precutala gravuru.
+        izmjereno = bool(getattr(op, "izmjereno", False))
+        kada = str(getattr(op, "mjereno_kada", "") or "")
+        provjereno = izmjereno or (bool(p.verified) if p else False)
         imena = {polje: (ime, jed) for polje, ime, jed in MASINA_POLJA}
 
         ponuda = []
@@ -514,7 +551,13 @@ def _pitanje_masine(n: A.Nalog, stanje: Stanje) -> dict | None:
                 ponuda.append(f"snaga {_g(vrijednost)} {jed}".strip())
 
         if ponuda:
-            oznaka = "" if provjereno else " Nije mjereno na tvojoj masini."
+            if izmjereno:
+                oznaka = (f" IZMJERENO na tvojoj masini{' ' + kada if kada else ''}, "
+                          f"test-mrezom - ne iz uputstva.")
+            elif provjereno:
+                oznaka = ""
+            else:
+                oznaka = " Nije mjereno na tvojoj masini."
             pitanje = (f"Postavke za {SLOJ_IME[sloj]}. Preset nudi: {', '.join(ponuda)}."
                        f"{oznaka} Napisi 'da' da uzmemo sve, ili npr. 'brzina 85 snaga 40' "
                        f"da promijenis sto hoces - ostalo ide iz preseta.")
@@ -589,9 +632,15 @@ def _pitanje_fajla(stanje: Stanje) -> dict | None:
 
 
 def sljedece_pitanje(stanje: Stanje) -> dict | None:
-    """Pitanje na koje se ceka odgovor, po trenutnoj fazi. None kad nema vise."""
+    """Pitanje na koje se ceka odgovor, po trenutnoj fazi. None kad nema vise.
+
+    Fajl se trazi samo na pocetku, dok nalog jos nije napisan. Ranije se trazio
+    uvijek dok ga nema, pa bi operater koji nije prilozio fajl na svaku poruku
+    dobijao istu recenicu - razgovor koji se vrti u mjestu i nikad ne napreduje.
+    Fajl ostaje blokada u provjeri prije starta; razgovor ide dalje bez njega.
+    """
     p = _pitanje_fajla(stanje)
-    if p is not None:
+    if p is not None and not stanje.tekst_naloga:
         return p
     preostalo = pitanja_naloga(stanje)
     if preostalo:
@@ -779,7 +828,7 @@ def provjera_prije_starta(stanje: Stanje, kamera: dict | None = None) -> tuple[l
     upozorenja: list[str] = list(provjera_kamere(kamera))
 
     if not stanje.fajl:
-        blokade.append("Fajl nije prilozen.")
+        blokade.append("Fajl nije prilozen - pritisni dugme za izbor fajla ispod polja za pisanje.")
     if n.posao is None:
         blokade.append("Vrsta posla nije odredjena.")
     if n.materijal is None:

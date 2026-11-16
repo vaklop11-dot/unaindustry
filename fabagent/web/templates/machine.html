@@ -1,22 +1,35 @@
 {% extends "base.html" %}
 {% block title %}Laser{% endblock %}
 {% block content %}
-<h1 class="h4">Upravljanje laserom (GRBL, Web Serial)</h1>
+<h1 class="h4">{{ t("Upravljanje laserom (GRBL, Web Serial)") }}</h1>
 <div class="alert alert-danger small" role="alert">
-  <strong>Sigurnost:</strong> laser klase 4 – zaštitne naočale za talasnu dužinu lasera, nikad bez nadzora, air assist i
+  <strong>{{ t("Sigurnost:") }}</strong> laser klase 4 – zaštitne naočale za talasnu dužinu lasera, nikad bez nadzora, air assist i
   aparat za gašenje požara pri ruci. „Stop“ šalje GRBL soft-reset (laser se gasi), ali uvijek znaj gdje je fizički prekidač napajanja.
 </div>
+{% if job %}
+<div class="alert {% if sam_izabrao %}alert-info{% else %}alert-success{% endif %} small d-flex flex-wrap gap-2 align-items-center" role="alert">
+  <span>{% if sam_izabrao %}Nisi izabrao posao, pa sam uzeo <strong>najnoviji</strong>:{% else %}Ucitan posao:{% endif %}
+    <strong>{{ job.slug }}</strong> <code class="small">{{ job.job_id }}</code></span>
+  <a class="btn btn-sm btn-outline-secondary ms-auto" href="/history/{{ job.job_id }}">{{ t("Pregled posla") }}</a>
+  <a class="btn btn-sm btn-outline-secondary" href="/razgovor">{{ t("Novi posao u razgovoru") }}</a>
+</div>
+{% else %}
+<div class="alert alert-warning small" role="alert">
+  Nema nijednog laserskog posla. Otvori <a href="/razgovor">Razgovor</a>, odgovori na pitanja,
+  prilozi fajl i pritisni <strong>Napravi posao</strong> - onda se vrati ovdje.
+</div>
+{% endif %}
 <div id="serial-unsupported" class="alert alert-warning" hidden>Ovaj browser nema Web Serial API. Koristi Google Chrome ili Microsoft Edge (verzija 89+), na adresi http://127.0.0.1.</div>
 
 <div class="row g-3">
   <div class="col-xl-5">
     <div class="card mb-3">
-      <div class="card-header small fw-semibold d-flex align-items-center">Veza
-        <span class="ms-auto badge text-bg-secondary machine-status" id="m-status">Otkopčano</span></div>
+      <div class="card-header small fw-semibold d-flex align-items-center">{{ t("Veza") }}
+        <span class="ms-auto badge text-bg-secondary machine-status" id="m-status">{{ t("Otkopčano") }}</span></div>
       <div class="card-body">
         <div class="d-flex flex-wrap gap-2 mb-2">
-          <button class="btn btn-primary" id="m-connect" type="button">Poveži se sa laserom</button>
-          <button class="btn btn-outline-secondary" id="m-disconnect" type="button" disabled>Prekini vezu</button>
+          <button class="btn btn-primary" id="m-connect" type="button">{{ t("Poveži se sa laserom") }}</button>
+          <button class="btn btn-outline-secondary" id="m-disconnect" type="button" disabled>{{ t("Prekini vezu") }}</button>
         </div>
         <p class="small text-muted mb-1">Browser će pitati za COM port. Brzina {{ baud }} baud. Ishodište mašine: {{ origin }}, sto {{ bed[0]|int }}×{{ bed[1]|int }} mm.</p>
         <p class="small mb-0">Stanje GRBL-a: <strong id="m-grbl">—</strong> · pozicija: <code id="m-pos">—</code></p>
@@ -41,16 +54,17 @@
     </div>
 
     <div class="card mb-3">
-      <div class="card-header small fw-semibold">Kontrole</div>
+      <div class="card-header small fw-semibold">{{ t("Kontrole") }}</div>
       <div class="card-body">
         <div class="d-flex flex-wrap gap-2">
           <button class="btn btn-outline-dark m-needs-conn" id="m-home" type="button" disabled>Home ({{ home_cmd }})</button>
-          <button class="btn btn-outline-dark m-needs-conn" id="m-unlock" type="button" disabled>Otključaj ($X)</button>
+          <button class="btn btn-outline-dark m-needs-conn" id="m-unlock" type="button" disabled>{{ t("Otključaj ($X)") }}</button>
           <button class="btn btn-outline-primary m-needs-conn m-needs-job" id="m-frame" type="button" disabled>Frame</button>
-          <button class="btn btn-success m-needs-conn m-needs-job" id="m-start" type="button" disabled>Start</button>
+          <button class="btn btn-success m-needs-conn m-needs-job" id="m-start" type="button" disabled>{{ t("Start") }}</button>
           <button class="btn btn-warning m-needs-conn" id="m-pause" type="button" disabled>⏸ Pause</button>
-          <button class="btn btn-danger m-needs-conn" id="m-stop" type="button" disabled>Stop</button>
+          <button class="btn btn-danger m-needs-conn" id="m-stop" type="button" disabled>{{ t("Stop") }}</button>
         </div>
+        <div class="alert alert-secondary small mt-3 mb-0 py-2" id="m-why">Provjeravam stanje…</div>
         <div class="progress mt-3" role="progressbar" aria-label="Napredak"><div class="progress-bar" id="m-progress" style="width:0%">0 %</div></div>
         <p class="small text-muted mt-2 mb-0">Frame obilazi okvir posla sa ugašenim laserom (samo S0/M5). Start radi samo za odobren job i traži potvrdu.</p>
       </div>

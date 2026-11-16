@@ -75,7 +75,8 @@ def test_da_prihvata_sve_postavke_iz_preseta():
     assert s.faza == "masina"
     assert s.cekam == "ENGRAVE.postavke"
     s = R.korak(s, "da")
-    for polje, ocekivano in (("brzina_mm_s", 100.0), ("snaga_posto", 30.0), ("prolaza", 1)):
+    # IZMJERENO test-mrezom 15.11.2026: 10000 mm/min, 80 %, 1 prolaz
+    for polje, ocekivano in (("brzina_mm_s", 10000 / 60), ("snaga_posto", 80.0), ("prolaza", 1)):
         zapis = s.masina[f"ENGRAVE.{polje}"]
         assert zapis["iz"] == "preset"
         assert zapis["vrijednost"] == pytest.approx(ocekivano)
@@ -185,7 +186,7 @@ def test_brzina_daje_i_mm_min():
     s = R.korak(_novo(), "graviraj sliku 100 x 100 mm na sperplocu, sivi tonovi")
     tekst = R.odgovor_na_pitanje(s, "koja brzina?")
     assert "mm/min" in tekst
-    assert "6000" in tekst          # 100 mm/s * 60
+    assert "10000" in tekst         # 166.667 mm/s * 60, izmjereno
 
 def test_snaga_daje_s_vrijednost():
     s = R.korak(_novo(), "graviraj sliku 100 x 100 mm na sperplocu, sivi tonovi")
@@ -457,15 +458,38 @@ def test_bez_fajla_je_blokada_pa_dugme_ne_moze():
     assert s.faza != "gotovo"
 
 
-def test_dok_se_ceka_fajl_tekst_ide_u_nalog():
-    """Kucanje ne moze dodati fajl - tekst se cita kao nalog, ne kao odgovor."""
-    s = R.korak(R.novo(), "graviraj sliku 120 x 160 mm")
-    assert s.cekam == "fajl"
-    s = R.korak(s, "na sperplocu, sivi tonovi")
+def test_prva_poruka_ide_u_nalog_pa_razgovor_ide_dalje():
+    """Fajl se trazi jednom, na pocetku; prva poruka se cita kao nalog.
+
+    Poslije toga razgovor mora napredovati i bez fajla - fajl ostaje blokada,
+    ne zid preko kojeg se ne moze.
+    """
+    s = R.novo()
+    assert R.sljedece_pitanje(s)["polje"] == "fajl"
+    s = R.korak(s, "graviraj sliku 120 x 160 mm na sperplocu, sivi tonovi")
     n = R.nalog(s)
     assert n.materijal == "sperploca_3mm"
     assert n.rezim_slike == "grayscale"
-    assert s.cekam == "fajl"
+    assert s.cekam != "fajl" and s.cekam != ""
+
+
+def test_bez_fajla_razgovor_ne_ponavlja_isto_pitanje():
+    """Regresija: bez fajla je svaka poruka dobijala istu recenicu, u nedogled.
+
+    Operater je odgovarao, a asistent je uvijek trazio fajl - razgovor koji se
+    vrti u mjestu. Sada svaki odgovor pomjeri razgovor, a na kraju ostane jasno
+    receno sta jos fali.
+    """
+    s = R.novo()
+    pitanja = []
+    for unos in ("graviraj sliku 120 x 160 mm na sperplocu, sivi tonovi",
+                 "0.15", "da"):
+        s = R.korak(s, unos)
+        pitanja.append(s.cekam)
+    assert len(set(pitanja)) == len(pitanja), pitanja
+    assert s.cekam == ""
+    blokade, _ = R.provjera_prije_starta(s)
+    assert any("Fajl" in b for b in blokade), blokade
 
 
 def test_sa_fajlom_tok_dolazi_do_gotovo():
@@ -522,3 +546,55 @@ def test_znanje_o_kameri():
     assert "/camera" in tekst
     assert "4 ugla" in tekst
     assert "ne znaci stajanje uz masinu" in tekst
+
+
+# ---------------- test-mreza izmjerena na masini 15.11.2026 -------------------
+def test_gravura_nudi_izmjerene_vrijednosti():
+    """Preset za gravuru mora doci iz test-mreze, ne iz uputstva."""
+    from fabagent.laser.presets import get_preset
+    op = get_preset("sperploca_3mm").engrave
+    assert op.izmjereno is True
+    assert round(op.speed_mm_s * 60) == 10000
+    assert op.power_pct == 80
+    assert op.passes == 1
+    assert op.line_interval_mm == 0.2
+
+
+def test_asistent_kaze_da_je_gravura_izmjerena():
+    s = _novo()
+    s = R.korak(s, "graviraj sliku 120 x 160 mm na sperplocu, sivi tonovi")
+    s = R.korak(s, "0.2")
+    p = R.sljedece_pitanje(s)
+    assert p is not None and p["polje"].endswith(".postavke")
+    assert "IZMJERENO" in p["pitanje"], p["pitanje"]
+    assert "10000 mm/min" in p["pitanje"], p["pitanje"]
+    assert "Nije mjereno" not in p["pitanje"]
+
+
+def test_rez_dolazi_iz_mreze():
+    """Rez mora doci iz mreze kockica, sa snagom koju je operater zapisao.
+
+    Bira se najmanji broj prolaza koji je presjekao plocu: 250 mm/min, 2 prolaza.
+    """
+    from fabagent.laser import mjerenja as M
+    assert M.REZ_SNAGA_PCT == 35
+    izbor = M.rez_izbor()
+    assert izbor["brzina_mm_min"] == 250
+    assert izbor["prolaza"] == 2
+    assert izbor["snaga_posto"] == 35
+    assert "250 mm/min -> 2 prolaza" in M.rez_tabela_teksta()
+
+
+def test_preset_reza_je_izmjeren():
+    from fabagent.laser.presets import get_preset
+    op = get_preset("sperploca_3mm").cut
+    assert op.izmjereno is True
+    assert round(op.speed_mm_s * 60) == 250
+    assert op.power_pct == 35
+    assert op.passes == 2
+
+
+def test_mjerenja_su_u_znanju():
+    tekst = R.odgovor_na_pitanje(R.novo(), "sta je mjereno na masini?")
+    assert "10000" in tekst and "80" in tekst
+    assert "250 mm/min -> 2 prolaza" in tekst

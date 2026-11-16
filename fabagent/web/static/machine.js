@@ -32,6 +32,26 @@
     $("m-cmd").disabled = !state.connected || state.running;
     $("m-home").disabled = !state.connected || state.running;
     $("m-unlock").disabled = !state.connected || state.running;
+    objasni();
+  }
+
+  // Dugme koje je iskljuceno, a ne kaze zasto, za operatera je pokvareno dugme.
+  // Frame i Start traze i vezu i napravljen posao - ovdje pise sta tacno fali.
+  function objasni() {
+    const box = $("m-why");
+    if (!box) return;
+    const fali = [];
+    if (!("serial" in navigator)) fali.push("ovaj browser nema Web Serial (treba Chrome ili Edge)");
+    else if (!state.connected) fali.push("nisi povezan na mašinu - pritisni Poveži i izaberi COM port");
+    if (!job) fali.push("nema napravljenog posla - otvori Razgovor, odgovori na pitanja, priloži fajl i pritisni Napravi posao");
+    if (state.running) fali.push("posao je u toku");
+    if (fali.length) {
+      box.className = "alert alert-warning small mt-3 mb-0 py-2";
+      box.textContent = "Frame i Start su isključeni jer: " + fali.join("; ") + ".";
+    } else {
+      box.className = "alert alert-success small mt-3 mb-0 py-2";
+      box.textContent = "Frame i Start su spremni. Redoslijed: Home, pa Frame (laser ugašen), pa Start.";
+    }
   }
 
   if (!("serial" in navigator)) { $("serial-unsupported").hidden = false; $("m-connect").disabled = true; }
@@ -50,7 +70,7 @@
     log(line, line.startsWith("error") || line.startsWith("ALARM") ? "err" : "");
     if (line === "ok" || line.startsWith("error")) {
       const p = state.pending.shift();
-      if (p) (line === "ok" ? p.resolve : p.reject)(new Error(line));
+      if (p) { if (line === "ok") p.resolve(line); else p.reject(new Error(line)); }
     }
     if (line.startsWith("ALARM")) { setStatus("Alarm", "danger"); state.abort = true; }
     if (line.startsWith("Grbl")) {                    // reset: sve na cekanju je ponisteno

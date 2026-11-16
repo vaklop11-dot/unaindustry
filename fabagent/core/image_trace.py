@@ -7,7 +7,8 @@ Redoslijed (deterministicki):
   4. denoise: Gaussian blur prije praga (opciono)
   5. prag: fiksni (cutoff <= sivo < threshold) ili adaptivni (cv2.adaptiveThreshold) uz cutoff
   6. denoise: morfolosko otvaranje + zatvaranje nakon praga (opciono)
-  7. trasiranje motorom: potrace (krivulje), konture (OpenCV + RDP) ili vtracer (ako je instaliran)
+  7. trasiranje motorom: vlastiti (nas kod, podrazumijevani), potrace (krivulje, GPL),
+     konture (OpenCV + RDP) ili vtracer (ako je instaliran)
   8. simplify: Ramer-Douglas-Peucker (cv2.approxPolyDP) na konturama, tolerancija u pikselima
 
 Opcione obrade se primjenjuju SAMO ako su zadane - nezadana obrada znaci "bez te obrade"
@@ -26,7 +27,7 @@ from fabagent.core import config as C
 from fabagent.core.errors import InvalidParam, MissingParam, OutOfRange, RangeViolation, ValidationFailed
 
 MODES = ("fiksni", "adaptivni")
-ENGINES = ("potrace", "konture", "vtracer")
+ENGINES = ("vlastiti", "potrace", "konture", "vtracer")
 _BOOL = {"true": True, "1": True, "da": True, "on": True, "false": False, "0": False, "ne": False}
 
 
@@ -38,7 +39,7 @@ class TraceOptions:
     denoise: int = 0                 # 0 = bez uklanjanja suma
     simplify: float = 0.0            # px; 0 = bez RDP
     mode: str = "fiksni"
-    engine: str = "potrace"
+    engine: str = "vlastiti"
 
     def as_dict(self) -> dict:
         return {"prag": self.threshold, "cutoff": self.cutoff, "invertuj": self.invert,
@@ -120,7 +121,7 @@ def parse_options(raw: dict) -> TraceOptions:
         return kind(t)
 
     mode = text("nacin_praga") or "fiksni"
-    engine = text("motor") or "potrace"
+    engine = text("motor") or "vlastiti"
     if mode not in MODES:
         raise InvalidParam(f"nacin_praga: '{mode}' nije dozvoljeno, izbor: {list(MODES)}")
     if engine not in ENGINES:
@@ -230,8 +231,30 @@ def _rdp(pts: np.ndarray, eps: float) -> np.ndarray:
     return out.astype(np.float64)
 
 
+def trace_vlastiti(fg: np.ndarray, o: TraceOptions) -> list[str]:
+    """Podrazumijevani motor: nas kod iz `core/trasiranje.py`.
+
+    Zasto je on podrazumijevani, a ne potrace: potrace je GPL v2+, pa bi program
+    sa njim unutra morao ici sa izvornim kodom. Ovaj motor koristi samo numpy i
+    standardnu biblioteku, pa ne vezuje nicije uslove za FabAgent.
+
+    Daje poligone, ne Bezier krivulje. Za rez i gravuru to nije gubitak - G-kod
+    je ionako niz pravih linija; krivulja se na kraju svejedno usitni.
+    """
+    from fabagent.core import trasiranje as TR
+    polys = TR.trasiraj(fg, uprosti=o.simplify, min_povrsina=float(C.POTRACE_TURDSIZE))
+    return TR.u_putanje(polys)
+
+
 def trace_potrace(fg: np.ndarray, o: TraceOptions) -> list[str]:
-    import potrace
+    # potrace je GPL v2+ i vise nije podrazumijevani motor. Ostaje kao izbor za
+    # one koji ga vec imaju, ali se smije i deinstalirati - tada ovaj motor samo
+    # kaze da ga nema, umjesto da se web server srusi na ImportError.
+    try:
+        import potrace
+    except ImportError:
+        raise InvalidParam("motor: potrace nije instaliran na ovom racunaru - "
+                           "izaberi 'vlastiti' (podrazumijevani) ili 'konture'") from None
     # potracer.Bitmap sam invertuje ulaz (True = svijetlo), pa mu se daju svijetli pikseli
     plist = potrace.Bitmap(~fg).trace(turdsize=C.POTRACE_TURDSIZE, alphamax=C.POTRACE_ALPHAMAX,
                                       opticurve=True, opttolerance=C.POTRACE_OPTTOLERANCE)
@@ -303,6 +326,8 @@ def trace_vtracer(fg: np.ndarray, o: TraceOptions) -> list[str]:
 
 def trace(fg: np.ndarray, o: TraceOptions) -> tuple[list[str], bool]:
     """Vraca (putanje, raw_elementi). raw_elementi=True znaci da su to vec SVG elementi (vtracer)."""
+    if o.engine == "vlastiti":
+        return trace_vlastiti(fg, o), False
     if o.engine == "konture":
         return trace_contours(fg, o), False
     if o.engine == "vtracer":

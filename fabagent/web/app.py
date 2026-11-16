@@ -235,9 +235,24 @@ def create_app(data_dir: str | None = None, camera_source: str | None = None) ->
                                  oznaka_koda=oznaka_koda)
     app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
 
+    def jezik_iz(request: Request) -> str:
+        """?lang=en ima prednost, inace kolacic, inace bosanski."""
+        from fabagent.core import jezik as J
+        trazen = request.query_params.get("lang")
+        if trazen:
+            return J.ocisti(trazen)
+        return J.ocisti(request.cookies.get("fab_lang"))
+
     def page(request: Request, name: str, ctx: dict, status: int = 200) -> HTMLResponse:
-        ctx = dict(ctx, request=request, sidebar_jobs=store.list()[:SIDEBAR_JOBS])
-        return templates.TemplateResponse(request, name, ctx, status_code=status)
+        from fabagent.core import jezik as J
+        jez = jezik_iz(request)
+        ctx = dict(ctx, request=request, sidebar_jobs=store.list()[:SIDEBAR_JOBS],
+                   jezik=jez, jezici=J.JEZICI, t=J.prevodilac(jez))
+        odgovor = templates.TemplateResponse(request, name, ctx, status_code=status)
+        # Izbor jezika se pamti, da se ?lang ne mora nositi kroz svaki link.
+        if request.query_params.get("lang"):
+            odgovor.set_cookie("fab_lang", jez, max_age=60 * 60 * 24 * 365, samesite="lax")
+        return odgovor
 
     def spec_or_404(kind: str, template: str):
         if kind not in KINDS:
@@ -439,6 +454,19 @@ def create_app(data_dir: str | None = None, camera_source: str | None = None) ->
                 "kreirana": getattr(calib, "created", ""), "sati": sati,
                 "izvor": camera.describe()}
 
+    def _zadnji_laserski():
+        """Zadnji napravljen laserski posao, da se iz razgovora moze skociti na masinu.
+
+        Svako otvaranje razgovora pocinje nov - to je namjerno. Ali posao
+        napravljen maloprije ne smije ostati bez poveznice: bez ovoga ga
+        operater trazi po istoriji dok stoji uz masinu.
+        """
+        try:
+            laserski = [j for j in store.list() if store.is_laser_job(j)]
+        except Exception:                          # noqa: BLE001
+            return None
+        return laserski[0] if laserski else None
+
     def razgovor_page(request, stanje, token="", fajl_ime="", banner=None, status=200):
         from fabagent.core import razgovor as Rz
         from fabagent.core.converter import SUPPORTED_EXT
@@ -452,7 +480,8 @@ def create_app(data_dir: str | None = None, camera_source: str | None = None) ->
                "procitano": Rz.nalog(stanje).procitano, "kamera": kamera,
                "parametri": Rz.parametri_masine(stanje), "blokade": blokade,
                "upozorenja": upozorenja, "teme": [n for n, _, _ in Rz.ZNANJE],
-               "spremno": stanje.faza == "gotovo" and not blokade}
+               "spremno": stanje.faza == "gotovo" and not blokade,
+               "zadnji_posao": _zadnji_laserski()}
         return page(request, "razgovor.html", ctx, status)
 
     @app.get("/razgovor", response_class=HTMLResponse)
