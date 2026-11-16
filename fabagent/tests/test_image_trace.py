@@ -123,7 +123,7 @@ def test_simplify_reduces_points_contours_engine():
     assert a_simp == pytest.approx(a_raw, rel=0.03)
 
 
-def test_simplify_with_potrace_flattens_curves():
+def test_simplify_vlastitim_motorom_daje_poligone():
     conv, res = trace_rings(noisy_circle(noise=0.0, blobs=False), prag=128, pojednostavljenje=1.0)
     assert " C " not in conv.svg.decode()                # krivulje su pretvorene u poligon
     assert len(res.layers["ENGRAVE"]) == 1

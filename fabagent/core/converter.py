@@ -4,9 +4,9 @@
                     (blokovi se razgradjuju). Jedinice iz $INSUNITS; ako ih nema, korisnik ih
                     mora zadati (nema pretpostavke). Ostali entiteti (TEXT, HATCH, SPLINE...)
                     -> blokirajuca greska, ne gube se tiho.
-  * PDF  (pymupdf): vektorski crtezi sa jedine stranice koja ih ima; samo slika -> greska;
+  * PDF  (vlastiti citac): vektorski crtezi sa jedine stranice koja ih ima; samo slika -> trasiranje;
                     tekst (fontovi) -> blokirajuca greska.
-  * PNG/JPG (pymupdf ucitava, potrace trasira): prag 0-255, ciljna sirina u mm (DPI slike se
+  * PNG/JPG (vlastito trasiranje): prag 0-255, ciljna sirina u mm (DPI slike se
                     ne pogadja).
 Rezultat je SVG u mm + napomene i blokirajuci problemi koji idu u izvjestaj fixer-a.
 """
@@ -185,101 +185,104 @@ def _entity_points(e, g2) -> np.ndarray | None:
 
 # ------------------------------------------------------------------- PDF
 def pdf_to_svg(data: bytes, trace_options=None) -> Conversion:
-    import pymupdf
+    """PDF -> SVG. Cita se vlastitim citacem (`core/pdf_citac.py`), bez pymupdf-a.
+
+    Razlog zamjene: pymupdf ide pod AGPL-3.0 ili placenu licencu, pa je sprjecavao
+    zatvorenu prodaju. Vlastiti citac koristi samo standardnu biblioteku i numpy.
+    """
+    from fabagent.core import pdf_citac as P
 
     try:
-        doc = pymupdf.open(stream=data, filetype="pdf")
-    except Exception as exc:
-        raise ValidationFailed("pdf", [f"PDF nije citljiv: {exc}"]) from exc
-    if doc.needs_pass:
-        raise ValidationFailed("pdf", ["PDF je zasticen lozinkom"])
-    pages = []
-    images_total = 0
-    for page in doc:
-        drawings = page.get_drawings()
-        images_total += len(page.get_images())
-        if drawings:
-            pages.append((page, drawings))
-    if not pages:
-        if images_total:
-            return _pdf_raster(doc, trace_options)
+        doc = P.ucitaj(data)
+    except P.PdfGreska as exc:
+        raise ValidationFailed("pdf", [str(exc)]) from exc
+
+    stranice = []
+    for st in doc.stranice:
+        mb = P.mediabox(doc, st)
+        try:
+            r = P.putanje(P.sadrzaj_stranice(doc, st), mb[3] - mb[1])
+        except P.PdfGreska as exc:
+            raise ValidationFailed("pdf", [str(exc)]) from exc
+        stranice.append((st, mb, r, P.slike_stranice(doc, st)))
+
+    sa_crtezom = [x for x in stranice if x[2]["putanje"]]
+    if not sa_crtezom:
+        if any(x[3] for x in stranice):
+            return _pdf_raster(doc, stranice, trace_options)
         raise ValidationFailed("pdf", ["PDF je prazan (nema vektorskih crteza)"])
+
     conv = Conversion(b"", "pdf")
-    if len(pages) > 1:
-        conv.blocking.append(f"PDF ima {len(pages)} stranice sa crtezima; za laser podijeli fajl na pojedinacne stranice")
-    page, drawings = pages[0]
-    if page.get_text().strip():
+    if len(sa_crtezom) > 1:
+        conv.blocking.append(f"PDF ima {len(sa_crtezom)} stranice sa crtezima; "
+                             "za laser podijeli fajl na pojedinacne stranice")
+    st, mb, r, slike = sa_crtezom[0]
+    broj_stranice = doc.stranice.index(st) + 1
+    if r["ima_teksta"]:
         conv.blocking.append("PDF sadrzi tekst (fontove) koji se ne moze pretvoriti bez fonta - "
                              "u programu za crtanje pretvori tekst u krivulje (Create Outlines) prije izvoza")
-    if page.get_images():
+    if slike:
         conv.blocking.append("PDF sadrzi i rastersku sliku pored vektora - slika bi se izgubila")
+
     pt_mm = C.MM_PER_IN / C.PT_PER_IN
-    W, H = page.rect.width * pt_mm, page.rect.height * pt_mm
+    x0, y0, x1, y1 = mb
+    W, H = (x1 - x0) * pt_mm, (y1 - y0) * pt_mm
     body = []
-    for d in drawings:
-        parts = []
-        for item in d["items"]:
-            op = item[0]
-            if op == "l":
-                parts.append(f"M {_fmt(item[1].x * pt_mm)} {_fmt(item[1].y * pt_mm)} "
-                             f"L {_fmt(item[2].x * pt_mm)} {_fmt(item[2].y * pt_mm)}")
-            elif op == "c":
-                p = [item[k] for k in range(1, 5)]
-                parts.append(f"M {_fmt(p[0].x * pt_mm)} {_fmt(p[0].y * pt_mm)} C " +
-                             " ".join(f"{_fmt(q.x * pt_mm)} {_fmt(q.y * pt_mm)}" for q in p[1:]))
-            elif op == "re":
-                r = item[1]
-                parts.append(f"M {_fmt(r.x0 * pt_mm)} {_fmt(r.y0 * pt_mm)} H {_fmt(r.x1 * pt_mm)} "
-                             f"V {_fmt(r.y1 * pt_mm)} H {_fmt(r.x0 * pt_mm)} Z")
-            elif op == "qu":
-                q = item[1]
-                pts = [q.ul, q.ur, q.lr, q.ll]
-                parts.append("M " + " L ".join(f"{_fmt(v.x * pt_mm)} {_fmt(v.y * pt_mm)}" for v in pts) + " Z")
-        if not parts:
+    boje = r.get("boje") or []
+    for i, (tacke, zatvorena) in enumerate(zip(r["putanje"], r["zatvorene"])):
+        if len(tacke) < 2:
             continue
-        dstr = " ".join(parts) + (" Z" if d.get("closePath") else "")
-        fill = _hex(d.get("fill")) if d.get("fill") is not None else "none"
-        stroke = _hex(d.get("color")) if d.get("color") is not None else "none"
-        if stroke == "none" and fill == "none":
+        d = "M " + " L ".join(f"{_fmt((x - x0) * pt_mm)} {_fmt((y - y0) * pt_mm)}" for x, y in tacke)
+        if zatvorena:
+            d += " Z"
+        b = boje[i] if i < len(boje) else {}
+        popuna = b.get("popuna") or "none"
+        linija = b.get("linija") or "none"
+        if popuna == "none" and linija == "none":
             continue
-        body.append(f'<path d="{dstr}" fill="{fill}" stroke="{stroke}"/>')
-    conv.notes.append(f"PDF: {len(body)} vektorskih crteza sa stranice {page.number + 1}, "
+        body.append(f'<path d="{d}" fill="{popuna}" stroke="{linija}"/>')
+    if not body:
+        raise ValidationFailed("pdf", ["PDF nema nijednu putanju koja se moze rezati"])
+
+    conv.notes.append(f"PDF: {len(body)} vektorskih putanja sa stranice {broj_stranice}, "
                       f"stranica {W:.1f} x {H:.1f} mm (1 pt = 1/72 in)")
     conv.svg = _svg_doc(W, H, body, "PDF konverzija")
     conv.preview_source = conv.svg
     return conv
 
 
-def _hex(rgb) -> str:
-    r, g, b = (max(0, min(255, int(round(c * 255)))) for c in rgb[:3])
-    return f"#{r:02x}{g:02x}{b:02x}"
+def _pdf_raster(doc, stranice, trace_options) -> Conversion:
+    """PDF bez vektora: tacno jedna slika -> trasiranje. Velicina iz polozaja na stranici."""
+    from fabagent.core import pdf_citac as P
 
-
-# ------------------------------------------------------------------- slike
-def _pdf_raster(doc, trace_options) -> Conversion:
-    """PDF bez vektora: tacno jedna slika -> trasiranje. Velicina iz polozaja slike na stranici."""
-    import pymupdf
-    placements = []
-    for page in doc:
-        for img in page.get_images(full=True):
-            for rect in page.get_image_rects(img[0]):
-                placements.append((page, img[0], rect))
+    postavljene = []
+    for st, mb, r, slike in stranice:
+        for i, sl in enumerate(slike):
+            mjere = r["slike"][i] if i < len(r["slike"]) else None
+            postavljene.append((st, sl, mjere))
     if trace_options is None or (trace_options.threshold is None and trace_options.mode == "fiksni"):
         raise ValidationFailed("pdf", ["PDF ne sadrzi vektore, samo sliku - zadaj parametre trasiranja "
                                        "(prag itd.) da bi se slika pretvorila u vektore"])
-    if len(placements) != 1:
-        raise ValidationFailed("pdf", [f"PDF ne sadrzi vektore, a ima {len(placements)} postavljenih slika; "
+    if len(postavljene) != 1:
+        raise ValidationFailed("pdf", [f"PDF ne sadrzi vektore, a ima {len(postavljene)} postavljenih slika; "
                                        "za trasiranje mora imati tacno jednu"])
-    page, xref, rect = placements[0]
-    pix = pymupdf.Pixmap(doc, xref)
-    if pix.alpha or (pix.colorspace and pix.colorspace.n not in (1, 3)):
-        pix = pymupdf.Pixmap(pymupdf.csRGB, pix)
+    st, sl, mjere = postavljene[0]
+    broj_stranice = doc.stranice.index(st) + 1
+    try:
+        png = P.slika_kao_png(doc, sl["broj"])
+    except P.PdfGreska as exc:
+        raise ValidationFailed("pdf", [str(exc)]) from exc
+
     pt_mm = C.MM_PER_IN / C.PT_PER_IN
-    conv = image_to_svg(pix.tobytes("png"), None, rect.width * pt_mm, options=trace_options,
-                        height_mm=rect.height * pt_mm)
+    if mjere and mjere["sirina_pt"] > 0 and mjere["visina_pt"] > 0:
+        w_mm, h_mm = mjere["sirina_pt"] * pt_mm, mjere["visina_pt"] * pt_mm
+    else:                                               # nema matrice: uzmi cijelu stranicu
+        mb = P.mediabox(doc, st)
+        w_mm, h_mm = (mb[2] - mb[0]) * pt_mm, (mb[3] - mb[1]) * pt_mm
+    conv = image_to_svg(png, None, w_mm, options=trace_options, height_mm=h_mm)
     conv.source_format = "pdf"
-    conv.notes.insert(0, f"PDF ne sadrzi vektore: slika sa stranice {page.number + 1} "
-                         f"({rect.width * pt_mm:.1f} x {rect.height * pt_mm:.1f} mm) je trasirana")
+    conv.notes.insert(0, f"PDF ne sadrzi vektore: slika sa stranice {broj_stranice} "
+                         f"({w_mm:.1f} x {h_mm:.1f} mm) je trasirana")
     return conv
 
 

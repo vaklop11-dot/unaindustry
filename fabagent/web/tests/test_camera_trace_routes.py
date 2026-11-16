@@ -118,8 +118,8 @@ def test_upload_image_with_advanced_options_and_views(client):
 
     # ponovna obrada istog fajla sa drugim postavkama (bez uploada)
     r2 = client.post("/upload/retrace", data={"job_id": job_id, "materijal": "sperploca_3mm",
-                                              "sirina_mm": "50", "prag": "128", "motor": "potrace"})
-    assert r2.status_code == 200 and "motor potrace" in r2.text
+                                              "sirina_mm": "50", "prag": "128", "motor": "vlastiti"})
+    assert r2.status_code == 200 and "motor vlastiti" in r2.text
     job2 = re.search(r'name="job_id" value="([^"]+)"', r2.text).group(1)
     assert job2 != job_id
 

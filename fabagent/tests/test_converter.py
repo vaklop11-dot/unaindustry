@@ -177,7 +177,7 @@ def test_image_trace_and_fix(fmt, name):
     mm = 60.0 / 120
     net = abs(sum(g2.signed_area(r) for r in eng))
     expected = (50 * 40 - 20 * 20) * mm * mm
-    assert net == pytest.approx(expected, rel=0.05)     # potrace zaobljava uglove
+    assert net == pytest.approx(expected, rel=0.05)     # trasiranje zaobljava uglove
 
 
 def test_image_threshold_changes_result():

@@ -480,10 +480,10 @@ PARAM_NAME_CHARS = string.ascii_lowercase + string.digits + "_"
 IMAGE_THRESHOLD_MIN = 1              # piksel < prag -> tamno (dio crteza)
 IMAGE_THRESHOLD_MAX = 255
 IMAGE_WIDTH_MIN_MM = 5.0
-IMAGE_MAX_PIXELS = 1_500_000         # potrace (cisti Python) - veca slika = sporo trasiranje
+IMAGE_MAX_PIXELS = 1_500_000         # trasiranje u cistom Pythonu - veca slika = sporije
 IMAGE_ALPHA_OPAQUE = 128             # alfa ispod ovoga = providno (pozadina)
 POTRACE_TURDSIZE = 2                 # mrlje manje od ovoliko piksela se zanemaruju
-POTRACE_ALPHAMAX = 1.0               # zaobljenost uglova (potrace standard)
+POTRACE_ALPHAMAX = 1.0               # zadrzano zbog vtracera; vlastiti motor ga ne koristi
 POTRACE_OPTTOLERANCE = 0.2           # tolerancija optimizacije krivulja (potrace standard)
 
 # Napredna obrada slike (core/image_trace.py)

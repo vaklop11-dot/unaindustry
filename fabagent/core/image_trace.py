@@ -7,8 +7,8 @@ Redoslijed (deterministicki):
   4. denoise: Gaussian blur prije praga (opciono)
   5. prag: fiksni (cutoff <= sivo < threshold) ili adaptivni (cv2.adaptiveThreshold) uz cutoff
   6. denoise: morfolosko otvaranje + zatvaranje nakon praga (opciono)
-  7. trasiranje motorom: vlastiti (nas kod, podrazumijevani), potrace (krivulje, GPL),
-     konture (OpenCV + RDP) ili vtracer (ako je instaliran)
+  7. trasiranje motorom: vlastiti (nas kod, podrazumijevani), konture (OpenCV + RDP)
+     ili vtracer (ako je instaliran)
   8. simplify: Ramer-Douglas-Peucker (cv2.approxPolyDP) na konturama, tolerancija u pikselima
 
 Opcione obrade se primjenjuju SAMO ako su zadane - nezadana obrada znaci "bez te obrade"
@@ -27,7 +27,7 @@ from fabagent.core import config as C
 from fabagent.core.errors import InvalidParam, MissingParam, OutOfRange, RangeViolation, ValidationFailed
 
 MODES = ("fiksni", "adaptivni")
-ENGINES = ("vlastiti", "potrace", "konture", "vtracer")
+ENGINES = ("vlastiti", "konture", "vtracer")
 _BOOL = {"true": True, "1": True, "da": True, "on": True, "false": False, "0": False, "ne": False}
 
 
@@ -74,7 +74,7 @@ def _run_vtracer(png: bytes, mode: str) -> str:
             raise ValidationFailed("slika", [f"vtracer nije zavrsio za {C.TRACE_VTRACER_TIMEOUT_S} s"]) from None
         if proc.returncode != 0 or not dst.is_file():
             err = proc.stderr.decode(errors="replace").strip().splitlines()[-1:] or [f"izlazni kod {proc.returncode}"]
-            raise ValidationFailed("slika", [f"vtracer se srusio ili nije uspio ({err[0]}) - koristi potrace ili konture"])
+            raise ValidationFailed("slika", [f"vtracer se srusio ili nije uspio ({err[0]}) - koristi 'vlastiti' ili 'konture'"])
         return dst.read_text(encoding="utf-8")
 
 
@@ -127,7 +127,7 @@ def parse_options(raw: dict) -> TraceOptions:
     if engine not in ENGINES:
         raise InvalidParam(f"motor: '{engine}' nije dozvoljeno, izbor: {list(ENGINES)}")
     if not engine_available(engine):
-        raise InvalidParam(f"motor: {vtracer_status()[1]} - izaberi potrace ili konture")
+        raise InvalidParam(f"motor: {vtracer_status()[1]} - izaberi 'vlastiti' ili 'konture'")
     inv = text("invertuj")
     if inv is not None and inv.lower() not in _BOOL:
         raise InvalidParam(f"invertuj: '{inv}' nije bool (true/false)")
@@ -246,47 +246,6 @@ def trace_vlastiti(fg: np.ndarray, o: TraceOptions) -> list[str]:
     return TR.u_putanje(polys)
 
 
-def trace_potrace(fg: np.ndarray, o: TraceOptions) -> list[str]:
-    # potrace je GPL v2+ i vise nije podrazumijevani motor. Ostaje kao izbor za
-    # one koji ga vec imaju, ali se smije i deinstalirati - tada ovaj motor samo
-    # kaze da ga nema, umjesto da se web server srusi na ImportError.
-    try:
-        import potrace
-    except ImportError:
-        raise InvalidParam("motor: potrace nije instaliran na ovom racunaru - "
-                           "izaberi 'vlastiti' (podrazumijevani) ili 'konture'") from None
-    # potracer.Bitmap sam invertuje ulaz (True = svijetlo), pa mu se daju svijetli pikseli
-    plist = potrace.Bitmap(~fg).trace(turdsize=C.POTRACE_TURDSIZE, alphamax=C.POTRACE_ALPHAMAX,
-                                      opticurve=True, opttolerance=C.POTRACE_OPTTOLERANCE)
-    paths = []
-    for curve in plist:
-        s = np.array([curve.start_point.x, curve.start_point.y])
-        if o.simplify > 0:
-            pts = [s]
-            cur = s
-            for seg in curve.segments:
-                end = np.array([seg.end_point.x, seg.end_point.y])
-                if seg.is_corner:
-                    pts += [np.array([seg.c.x, seg.c.y]), end]
-                else:
-                    c1, c2 = np.array([seg.c1.x, seg.c1.y]), np.array([seg.c2.x, seg.c2.y])
-                    n = max(2, int(math.ceil(np.linalg.norm(end - cur) / C.TRACE_FLATTEN_STEP_PX)))
-                    pts += list(_bezier(cur, c1, c2, end, n))
-                cur = end
-            poly = _rdp(np.array(pts), o.simplify)
-            if len(poly) >= 3:
-                paths.append(_poly_d(poly))
-            continue
-        d = [f"M {_fmt(s[0])} {_fmt(s[1])}"]
-        for seg in curve.segments:
-            if seg.is_corner:
-                d.append(f"L {_fmt(seg.c.x)} {_fmt(seg.c.y)} L {_fmt(seg.end_point.x)} {_fmt(seg.end_point.y)}")
-            else:
-                d.append("C " + " ".join(f"{_fmt(p.x)} {_fmt(p.y)}" for p in (seg.c1, seg.c2, seg.end_point)))
-        paths.append(" ".join(d) + " Z")
-    return paths
-
-
 def trace_contours(fg: np.ndarray, o: TraceOptions) -> list[str]:
     import cv2
     mask = fg.astype(np.uint8) * 255
@@ -332,4 +291,4 @@ def trace(fg: np.ndarray, o: TraceOptions) -> tuple[list[str], bool]:
         return trace_contours(fg, o), False
     if o.engine == "vtracer":
         return trace_vtracer(fg, o), True
-    return trace_potrace(fg, o), False
+    return trace_vlastiti(fg, o), False

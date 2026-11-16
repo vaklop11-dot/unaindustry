@@ -10,10 +10,16 @@ requires-python = ">=3.11"
 dependencies = ["numpy>=1.24", "trimesh>=4.0", "svgpathtools>=1.6"]
 
 [project.optional-dependencies]
-test = ["pytest>=7", "httpx>=0.27"]
+# pymupdf je ovdje SAMO da testovi mogu napraviti PDF za provjeru. Proizvod ga
+# ne uvozi nigdje - citanje PDF-a radi fabagent/core/pdf_citac.py, vlastiti kod.
+# Zato AGPL te biblioteke ne ide u ono sto se isporucuje korisniku.
+test = ["pytest>=7", "httpx>=0.27", "pymupdf>=1.24,<2"]
 web = ["fastapi>=0.110", "uvicorn>=0.29", "jinja2>=3.1", "python-multipart>=0.0.9"]
-# pymupdf 2.x povlaci ML pakete (onnxruntime, pymupdf-layout) - zato <2
-convert = ["ezdxf>=1.3", "pymupdf>=1.24,<2", "potracer>=0.0.4", "opencv-python-headless>=4.8"]
+# Sve ovdje mora biti permisivno (MIT/BSD/Apache) da se FabAgent moze prodavati
+# zatvoren. Izbaceno 16.11.2026:
+#   pymupdf  (AGPL-3.0 ili placena Artifex) -> core/pdf_citac.py, vlastiti kod
+#   potracer (GPL v2+)                      -> core/trasiranje.py, vlastiti kod
+convert = ["ezdxf>=1.3", "opencv-python-headless>=4.8"]
 camera = ["opencv-python-headless>=4.8"]
 # vtracer: eksperimentalno - pokrece se izolovano u zasebnom procesu i automatski se iskljucuje ako se
 # rusi (vtracer 0.6.15 + Python 3.14 + Windows: access violation)
