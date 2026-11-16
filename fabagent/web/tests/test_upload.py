@@ -80,7 +80,7 @@ def test_upload_with_unresolved_open_path_blocks_approve(client):
 def test_raster_rejected_with_message(client):
     r = _upload(client, RASTER)
     assert r.status_code == 422
-    assert "Raster slike nisu dozvoljene za laser" in r.text
+    assert "ugradjenu sliku" in r.text and "Upload" in r.text
     assert list((client.data_dir / "jobs").iterdir()) == []
 
 

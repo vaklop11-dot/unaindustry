@@ -76,7 +76,7 @@ def test_open_gap_too_large_is_blocking():
 def test_raster_rejected():
     with pytest.raises(ValidationFailed) as e:
         fix_svg(_svg('<g><image href="data:image/png;base64,AAAA" width="10" height="10"/></g>'))
-    assert "Raster slike nisu dozvoljene za laser" in str(e.value)
+    assert "ugradjenu sliku" in str(e.value) and "Upload" in str(e.value)
 
 
 @pytest.mark.parametrize("data", [b"nije xml", b"<html/>",
@@ -148,3 +148,23 @@ def test_use_element_blocking():
 def test_geometry_outside_document_blocking():
     res = fix_svg(_svg('<rect x="80" y="80" width="40" height="40" fill="none" stroke="#000"/>'))
     assert not res.production_ready and any("izvan dokumenta" in b for b in res.report.blocking)
+
+
+def test_obican_doctype_bez_unutrasnjih_deklaracija_prolazi():
+    """Tako izvoze CorelDRAW i Illustrator - vanjski DTD, bez ENTITY.
+    Ranije je padao svaki takav paket jer se trazilo '[' bilo gdje u zaglavlju."""
+    svg = (b'<?xml version="1.0" encoding="UTF-8"?>\r\n'
+           b'<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"'
+           b' "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\r\n'
+           b'<svg xmlns="http://www.w3.org/2000/svg" width="10mm" height="10mm"'
+           b' viewBox="0 0 10 10" style="fill-rule:evenodd">'
+           b'<path d="M0,0 L10,0 L10,10 L0,10 Z"/></svg>')
+    r = fix_svg(svg, "corel.svg")
+    assert r.svg
+
+
+def test_doctype_sa_unutrasnjim_podskupom_i_dalje_pada():
+    svg = (b'<!DOCTYPE svg [<!ELEMENT svg ANY>]>'
+           b'<svg xmlns="http://www.w3.org/2000/svg"/>')
+    with pytest.raises(ValidationFailed):
+        fix_svg(svg, "zlo.svg")

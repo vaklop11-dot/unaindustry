@@ -285,9 +285,22 @@ def fix_svg(data: bytes, filename: str = "upload.svg") -> FixResult:
 
     if len(data) > C.UPLOAD_MAX_BYTES:
         _reject(filename, f"fajl je veci od {C.UPLOAD_MAX_BYTES // (1024 * 1024)} MB")
-    head = data[:4096].lower()
-    if b"<!entity" in data.lower() or (b"<!doctype" in head and b"[" in head.split(b"<!doctype", 1)[1][:2048]):
-        _reject(filename, "DOCTYPE/ENTITY deklaracije nisu dozvoljene")
+    # XXE i "billion laughs" dolaze iskljucivo preko unutrasnjeg podskupa
+    # (<!DOCTYPE svg [ ... ]>) i preko <!ENTITY>. Obican DOCTYPE koji samo
+    # pokazuje na vanjski DTD (tako izvoze CorelDRAW i Illustrator) ne nosi
+    # nikakav rizik - ElementTree vanjski DTD ne dohvata. Ranije je ovdje bila
+    # provjera "ima li '[' u prvih 2048 bajta poslije DOCTYPE-a", pa je padao
+    # svaki komercijalni paket cim bi se '[' pojavilo bilo gdje u stilu ili
+    # putanji. Sada se gleda samo da li '[' dolazi PRIJE kraja same deklaracije.
+    nisko = data.lower()
+    if b"<!entity" in nisko:
+        _reject(filename, "ENTITY deklaracije nisu dozvoljene")
+    i = nisko.find(b"<!doctype")
+    if i >= 0:
+        kraj = data.find(b">", i)
+        uglasta = data.find(b"[", i)
+        if uglasta != -1 and (kraj == -1 or uglasta < kraj):
+            _reject(filename, "DOCTYPE sa unutrasnjim deklaracijama nije dozvoljen")
     try:
         root = ET.fromstring(data)
     except ET.ParseError as exc:
@@ -295,7 +308,8 @@ def fix_svg(data: bytes, filename: str = "upload.svg") -> FixResult:
     if _tag(root) != "svg":
         _reject(filename, "fajl nije SVG (korijenski element nije <svg>)")
     if any(_tag(el) == "image" for el in root.iter()):
-        _reject(filename, "Raster slike nisu dozvoljene za laser (pronadjen <image> element)")
+        _reject(filename, "SVG sadrzi ugradjenu sliku (<image>), a ovuda idu samo linije. "
+                "Za graviranje slike posalji PNG ili JPG kroz Upload.")
 
     rep = FixReport()
     # --- jedinice i velicina dokumenta
