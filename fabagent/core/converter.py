@@ -54,9 +54,13 @@ def detect_format(filename: str) -> str:
     if ext in ARHIVA_EXT:
         mb = C.UPLOAD_MAX_BYTES // (1024 * 1024)
         raise InvalidParam(
-            f"fajl: '{ext}' je arhiva, a ne crtez. Raspakuj je i prilozi jedan fajl iz nje "
-            f"({', '.join(SUPPORTED_EXT)}). Arhive se kroz ovu formu ne mogu ni poslati - "
-            f"granica je {mb} MB, a paketi su po vise stotina MB.")
+            f"fajl: '{ext}' je arhiva, a ne crtez. "
+            + ("ZIP se ne salje kroz ovu formu - otvori stranicu 'Arhive', ona ga cita "
+               "sa diska bez raspakivanja i iz njega se bira jedan crtez."
+               if ext == ".zip" else
+               f"Prepakuj je u .zip pa je otvori kroz stranicu 'Arhive', ili prilozi "
+               f"jedan fajl iz nje ({', '.join(SUPPORTED_EXT)}).")
+            + f" Granica za slanje kroz formu je {mb} MB.")
     if ext not in SUPPORTED_EXT:
         raise InvalidParam(f"fajl: format '{ext or '?'}' nije podrzan; dozvoljeno: {', '.join(SUPPORTED_EXT)}")
     return "jpg" if ext == ".jpeg" else ext[1:]
