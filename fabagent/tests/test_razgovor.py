@@ -577,11 +577,11 @@ def test_rez_dolazi_iz_mreze():
     Bira se najmanji broj prolaza koji je presjekao plocu: 250 mm/min, 2 prolaza.
     """
     from fabagent.laser import mjerenja as M
-    assert M.REZ_SNAGA_PCT == 35
+    assert M.REZ_SNAGA_PCT == 100
     izbor = M.rez_izbor()
     assert izbor["brzina_mm_min"] == 250
     assert izbor["prolaza"] == 2
-    assert izbor["snaga_posto"] == 35
+    assert izbor["snaga_posto"] == 100
     assert "250 mm/min -> 2 prolaza" in M.rez_tabela_teksta()
 
 
@@ -590,7 +590,7 @@ def test_preset_reza_je_izmjeren():
     op = get_preset("sperploca_3mm").cut
     assert op.izmjereno is True
     assert round(op.speed_mm_s * 60) == 250
-    assert op.power_pct == 35
+    assert op.power_pct == 100
     assert op.passes == 2
 
 
