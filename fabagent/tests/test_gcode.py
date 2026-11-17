@@ -104,7 +104,8 @@ def test_layer_settings_validation_and_preset():
     assert set(pre) == {"CUT", "ENGRAVE", "SCORE"} and pre["ENGRAVE"]["interval_mm"] == 0.2   # IZMJERENO 15.11.2026
     assert "CUT" not in preset_layer_settings(PRESETS["eloksirani_aluminij"])
     ok = parse_layer_settings(pre, ["CUT", "ENGRAVE"])
-    assert ok["CUT"].s_value == 350      # 35 % od S max 1000, IZMJERENO 15.11.2026
+    assert ok["CUT"].s_value == 1000     # 100 % od S max 1000, IZMJERENO 15.11.2026,
+                                     # ispravljeno 17.11.2026 (ranije pogresno upisano 35 %)
     with pytest.raises(MissingParam):
         parse_layer_settings({"CUT": {"mode": "Cut", "speed_mm_s": 5}}, ["CUT"])
     with pytest.raises(OutOfRange):

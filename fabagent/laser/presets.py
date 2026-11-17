@@ -72,14 +72,14 @@ PRESETS: dict[str, MaterialPreset] = {
             # REZ i SCORE: jos polazne vrijednosti. Mreza reza postoji, ali snaga na
             # kojoj je radjena nije zapisana, pa se brojevi ne izmisljaju.
             "sperploca_3mm", "Sperploca (breza/lipa) 3 mm", 3.0,
-            cut=OpSetting(250.0 / 60.0, 35, 2,
+            cut=OpSetting(250.0 / 60.0, 100, 2,
                           izmjereno=True, mjereno_kada="15.11.2026"),
             engrave=OpSetting(10000.0 / 60.0, 80, 1, 0.2,
                               izmjereno=True, mjereno_kada="15.11.2026"),
             score=OpSetting(40.0, 25, 1),
             verified=False,
             note="Gravura i rez IZMJERENI na ovoj masini 15.11.2026 test-mrezama. "
-                 "Rez: 250 mm/min, 35 %, 2 prolaza - najmanji broj prolaza koji je "
+                 "Rez: 250 mm/min, 100 %, 2 prolaza - najmanji broj prolaza koji je "
                  "presjekao plocu. Ucrtavanje (SCORE) nije mjereno.",
         ),
         MaterialPreset(

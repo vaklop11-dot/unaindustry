@@ -56,7 +56,10 @@ REZ_MREZA: dict[int, dict[int, bool]] = {
     4: {250: True,  450: True,  600: True},
 }
 
-REZ_SNAGA_PCT: int | None = 35                      # operater, 15.11.2026: "35 % su snaga kockica"
+REZ_SNAGA_PCT: int | None = 100                     # operater, 17.11.2026: ispravka - kockice
+                                                    # su rezane na 100 %, ne 35 %. Raniji
+                                                    # unos od 35 % bio je greska u citanju
+                                                    # mreze i davao je preslab rez.
 
 
 # ------------------------------------------------------- izbor iz mreze
