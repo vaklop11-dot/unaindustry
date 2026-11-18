@@ -175,3 +175,25 @@ def izvjestaj(lista: list[Celija]) -> list[dict]:
              "brzina_mm_min": c.brzina_mm_min, "snaga_pct": c.snaga_pct,
              "prolaza": c.prolaza, "x_mm": round(c.x_mm, 2), "y_mm": round(c.y_mm, 2)}
             for c in lista]
+
+
+def gcode_okvir(celije_izvjestaj: list[dict], strana_mm: float = 10.0) -> str:
+    """Okvir oko cijele mreze, laser ugasen (Frame). Samo G0/G1 sa S0 i M5."""
+    if not celije_izvjestaj:
+        raise InvalidParam("mreza: nema celija za okvir")
+    xs = [c["x_mm"] for c in celije_izvjestaj]
+    ys = [c["y_mm"] for c in celije_izvjestaj]
+    a = float(celije_izvjestaj[0].get("strana_mm") or strana_mm)
+    x0, y0 = min(xs), min(ys)
+    x1, y1 = max(xs) + a, max(ys) + a
+    H = float(C.LASER_WORK_AREA_MM[1])
+    d = C.GCODE_DECIMALS
+    xy = lambda x, y: f"X{x:.{d}f} Y{H - y:.{d}f}"          # noqa: E731
+    feed = f"F{C.GRBL_TRAVEL_FEED_MM_MIN:.0f}"
+    L = ["; FabAgent okvir test mreze - laser ostaje ugasen",
+         "G21 ; mm", "G90 ; apsolutno", "M5", "S0",
+         f"G0 {xy(x0, y0)}"]
+    for px, py in ((x1, y0), (x1, y1), (x0, y1), (x0, y0)):
+        L.append(f"G1 {xy(px, py)} S0 {feed}")
+    L += ["M5", "M2"]
+    return "\n".join(L) + "\n"

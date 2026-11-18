@@ -353,12 +353,69 @@ def create_app(data_dir: str | None = None, camera_source: str | None = None) ->
             return page(request, "test_mreza.html", dict(ctx, banner=error_view(exc)[0]),
                         HTTP_UNPROCESSABLE)
         import base64 as _b64
-        ctx.update({"celije": TM.izvjestaj(cel), "nc": nc,
+        izvjestaj = TM.izvjestaj(cel)
+        posao = None
+        try:
+            posao = store.create_test_mreza(mat, deb, izvjestaj, nc, pregled, gravura)
+        except Exception as exc:                        # noqa: BLE001
+            ctx["upozorenje"] = f"Mreza je napravljena, ali nije upisana u Istoriju: {exc}"
+        ctx["posao"] = posao
+        ctx.update({"celije": izvjestaj, "nc": nc,
                     "nc_b64": _b64.b64encode(nc.encode("utf-8")).decode("ascii"),
                     "pregled_uri": "data:image/svg+xml;base64,"
                                    + _b64.b64encode(pregled.encode("utf-8")).decode("ascii"),
                     "gravura": gravura})
         return page(request, "test_mreza.html", ctx)
+
+    @app.get("/test-mreza/{job_id}", response_class=HTMLResponse)
+    def test_mreza_posao(request: Request, job_id: str):
+        from fabagent.laser import ucenje as U
+        rec = store.get(job_id)
+        baza = U.Baza.ucitaj(store.ishodi_putanja)
+        vec = {z.napomena.split("@")[-1].strip(): z.ishod
+               for z in baza.zapisi if z.job_id == job_id and "@" in z.napomena}
+        return page(request, "test_mreza_posao.html",
+                    {"posao": rec, "celije": rec.get("celije") or [],
+                     "ishodi": list(U.ISHODI), "vec": vec,
+                     "sazetak": U.sazetak(baza).get(rec["params"].get("materijal", ""), {})})
+
+    @app.post("/test-mreza/{job_id}/ishodi", response_class=HTMLResponse)
+    async def test_mreza_ishodi(request: Request, job_id: str):
+        """Jedan klik upisuje ishod za sve ocijenjene kvadratice.
+
+        Ovo je mjesto gdje mjerenje postaje podatak: bez njega mreza ostaje
+        komad drveta, a model nema odakle da uci.
+        """
+        from fabagent.laser import ucenje as U
+        rec = store.get(job_id)
+        form = await request.form()
+        mat = rec["params"].get("materijal", "")
+        deb = float(rec["params"].get("debljina_mm") or 0) or 0.0
+        operacija = "gravura" if rec["params"].get("gravura") else "rez"
+        baza = U.Baza.ucitaj(store.ishodi_putanja)
+        upisano, greske = 0, []
+        for c in rec.get("celije") or []:
+            izbor = str(form.get("ishod_" + c["oznaka"]) or "").strip()
+            if not izbor:
+                continue
+            try:
+                baza.dodaj(U.Zapis(
+                    datum="", materijal=mat, debljina_mm=deb or 0.1, operacija=operacija,
+                    brzina_mm_min=float(c["brzina_mm_min"]), snaga_pct=float(c["snaga_pct"]),
+                    prolaza=int(c["prolaza"]), interval_mm=None, ishod=izbor,
+                    job_id=job_id, napomena=f"test mreza @ {c['oznaka']}"))
+                upisano += 1
+            except (ValueError, TypeError) as exc:
+                greske.append(f"{c['oznaka']}: {exc}")
+        vec = {z.napomena.split("@")[-1].strip(): z.ishod
+               for z in baza.zapisi if z.job_id == job_id and "@" in z.napomena}
+        poruka = f"Upisano {upisano} ishoda."
+        pre = U.preporuka(baza, mat, deb or 0.1, operacija)
+        return page(request, "test_mreza_posao.html",
+                    {"posao": rec, "celije": rec.get("celije") or [],
+                     "ishodi": list(U.ISHODI), "vec": vec, "poruka": poruka,
+                     "greske": greske, "preporuka": pre,
+                     "sazetak": U.sazetak(baza).get(mat, {})})
 
     # ------------------------------------------------- ucenje iz ishoda
     @app.post("/job/ishod")
@@ -408,6 +465,8 @@ def create_app(data_dir: str | None = None, camera_source: str | None = None) ->
     @app.get("/history/{job_id}", response_class=HTMLResponse)
     def history_detail(request: Request, job_id: str):
         job = store.get(job_id)
+        if job["type"] == "test_mreza":
+            return RedirectResponse(f"/test-mreza/{job_id}", status_code=303)
         if job["type"] in ("upload", "raster", "litho") or (
                 job["type"] == "laser" and job["template"] not in C.LASER_TEMPLATES):
             from fabagent.web.api import result_template

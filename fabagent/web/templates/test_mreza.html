@@ -10,6 +10,7 @@
 </p>
 
 {% if banner %}{{ banner|safe }}{% endif %}
+{% if upozorenje %}<div class="alert alert-warning small">{{ upozorenje }}</div>{% endif %}
 
 <div class="row g-3">
   <div class="col-lg-5">
@@ -75,6 +76,10 @@
         <a class="btn btn-sm btn-success ms-auto"
            download="test_mreza.nc"
            href="data:text/plain;base64,{{ nc_b64 }}">⬇ Preuzmi G-code (.nc)</a>
+        {% if posao %}
+        <a class="btn btn-sm btn-danger" href="/machine?job={{ posao.job_id }}">🔴 Otvori na laseru</a>
+        <a class="btn btn-sm btn-outline-light" href="/history/{{ posao.job_id }}">Istorija</a>
+        {% endif %}
       </div>
       <img src="{{ pregled_uri }}" class="img-fluid border bg-white" alt="pregled mreže">
     </div>

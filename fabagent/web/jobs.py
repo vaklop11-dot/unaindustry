@@ -477,6 +477,49 @@ class JobStore:
         self._save(rec)
         return rec
 
+    def create_test_mreza(self, materijal: str, debljina_mm, celije, nc: str, svg_tekst: str,
+                          gravura: bool) -> dict:
+        """Test mreza kao posao: ulazi u Istoriju i otvara se na laseru.
+
+        Bez ovoga je mreza bila samo fajl za preuzimanje - operater bi je slao
+        rucno, a ishod po celiji ne bi imao gdje da se zakaci.
+        """
+        import json as _json
+        from fabagent.laser.presets import get_preset
+
+        now, job_id, slug, job_dir = self._new_dir("test_mreza", materijal or "mreza")
+        nc_ime, svg_ime, cel_ime = f"{slug}.nc", f"{slug}.svg", "celije.json"
+        (job_dir / nc_ime).write_text(nc, encoding="utf-8")
+        (job_dir / svg_ime).write_text(svg_tekst, encoding="utf-8")
+        (job_dir / cel_ime).write_text(_json.dumps(celije, ensure_ascii=False, indent=1),
+                                       encoding="utf-8")
+        try:
+            preset = get_preset(materijal)
+            p_ime, p_ver = preset.name, preset.verified
+        except Exception:                                  # noqa: BLE001
+            p_ime, p_ver = materijal, False
+        brzine = sorted({c["brzina_mm_min"] for c in celije})
+        snage = sorted({c["snaga_pct"] for c in celije})
+        rec = {
+            "job_id": job_id, "created": now.isoformat(), "type": "test_mreza",
+            "template": "test_mreza", "slug": slug, "status": STATUS_PREVIEW,
+            "use_defaults": False,
+            "params": {"materijal": materijal, "debljina_mm": debljina_mm,
+                       "brzine": brzine, "snage": snage,
+                       "prolaza": celije[0]["prolaza"] if celije else 1,
+                       "gravura": gravura},
+            "params_raw": {}, "params_defaulted": [],
+            "outputs": [nc_ime, svg_ime, cel_ime], "renders": [], "sources": [],
+            "celije": celije, "gcode": nc_ime,
+            "preset": materijal, "preset_name": p_ime, "preset_verified": p_ver,
+            "warnings": ["Test mreza: svaki kvadratic ima svoje parametre. Start pritiska operater."],
+            "notes": [f"{len(celije)} kvadratica: {len(snage)} snaga x {len(brzine)} brzina"],
+            "estimates": {"vrijeme_s": None, "masa_g": None},
+            "summary": {"celija": len(celije), "brzine": brzine, "snage": snage},
+        }
+        self._save(rec)
+        return rec
+
     def create_litho(self, filename: str, data: bytes, raw: dict) -> dict:
         """Slika -> mapa visina -> STL/3MF (litofanija ili reljef)."""
         from fabagent.core import config as C
@@ -547,9 +590,11 @@ class JobStore:
     # ============================================================= slojevi i G-code
     @staticmethod
     def is_laser_job(rec: dict) -> bool:
-        return rec["type"] in ("laser", "upload", "raster")
+        return rec.get("type") == "test_mreza" or (rec["type"] in ("laser", "upload", "raster"))
 
     def designs(self, rec: dict) -> list:
+        if rec.get("type") == "test_mreza":
+            return []          # mreza nema dizajn: parametri su u samom G-code-u
         from fabagent.core.gcode import design_from_svg
         d = self._dir(rec["job_id"])
         svgs = [sh["svg"] for sh in rec.get("sheets") or []] or [n for n in rec["outputs"] if n.endswith(".svg")]
@@ -565,6 +610,8 @@ class JobStore:
         return [layer for layer in C.LAYERS if layer in used]
 
     def on_bed(self, rec: dict) -> bool:
+        if rec.get("type") == "test_mreza":
+            return True        # mreza je vec na apsolutnim koordinatama stola
         """Dizajn je vec rasporedjen na cijelom stolu (editor, ploce iz nestinga) -> pomak je 0, 0."""
         from fabagent.core import config as C
         if rec.get("on_bed"):
@@ -619,6 +666,17 @@ class JobStore:
         from fabagent.core.errors import InvalidParam, MissingParam
         from fabagent.laser.design import LaserDesign
         rec = self.get(job_id)
+        if rec.get("type") == "test_mreza":
+            # Test mreza nema dizajn ni slojeve: svaki kvadratic ima svoje
+            # parametre upisane u sam G-code. Zato se tekst cita iz fajla
+            # kakav jeste, bez ponovnog racunanja i bez pomaka.
+            tekst = self.file_path(job_id, rec["gcode"]).read_text(encoding="utf-8")
+            if frame:
+                from fabagent.laser import test_mreza as TM
+                tekst = TM.gcode_okvir(rec.get("celije") or [])
+            return {"text": tekst, "file": None, "path": None,
+                    "stats": {"celija": len(rec.get("celije") or []),
+                              "lines": tekst.count("\n"), "layers": ["TEST"]}}
         if not self.is_laser_job(rec):
             raise InvalidParam("G-code postoji samo za laserske jobove")
         if rec.get("blocking"):

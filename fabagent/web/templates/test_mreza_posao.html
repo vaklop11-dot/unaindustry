@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Test mreža — ishodi{% endblock %}
+{% block content %}
+<h1 class="h4 mb-1">🔲 Test mreža — upis ishoda</h1>
+<p class="text-muted small mb-3">
+  Materijal <strong>{{ posao.params.materijal }}</strong>{% if posao.params.debljina_mm %},
+  debljina {{ posao.params.debljina_mm }} mm{% endif %} ·
+  {{ celije|length }} kvadratića ·
+  {% if posao.params.gravura %}graviranje{% else %}rezanje{% endif %}
+</p>
+
+{% if poruka %}<div class="alert alert-success py-2 small">{{ poruka }}</div>{% endif %}
+{% if greske %}
+<div class="alert alert-danger py-2 small">
+  {% for g in greske %}<div>{{ g }}</div>{% endfor %}
+</div>
+{% endif %}
+
+{% if preporuka %}
+<div class="alert {% if preporuka.ima %}alert-info{% else %}alert-warning{% endif %} py-2 small">
+  {% if preporuka.ima %}
+    <strong>Preporuka ({{ preporuka.metoda }}, osnov {{ preporuka.osnov }} zapisa):</strong>
+    {{ preporuka.brzina_mm_min }} mm/min · {{ preporuka.snaga_pct }} % · {{ preporuka.prolaza }} prolaza
+    {% if preporuka.upozorenje %}<div class="mt-1">{{ preporuka.upozorenje }}</div>{% endif %}
+  {% else %}
+    <strong>{{ preporuka.razlog }}</strong>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <a class="btn btn-sm btn-danger" href="/machine?job={{ posao.job_id }}">🔴 Otvori na laseru</a>
+  <a class="btn btn-sm btn-outline-light" href="/jobs/{{ posao.job_id }}/{{ posao.gcode }}">⬇ G-code</a>
+  <a class="btn btn-sm btn-outline-light" href="/test-mreza">Nova mreža</a>
+</div>
+
+<form method="post" action="/test-mreza/{{ posao.job_id }}/ishodi">
+  <div class="card card-body">
+    <div class="table-responsive" style="max-height:60vh; overflow:auto">
+      <table class="table table-sm small align-middle mb-0">
+        <thead class="sticky-top">
+          <tr>
+            <th>Ćelija</th><th>Brzina (mm/min)</th><th>Snaga</th><th>Prolaza</th>
+            <th>Pozicija</th><th style="min-width:190px">Ishod</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in celije %}
+          <tr>
+            <td><code>{{ c.oznaka }}</code></td>
+            <td>{{ c.brzina_mm_min }}</td>
+            <td>{{ c.snaga_pct }} %</td>
+            <td>{{ c.prolaza }}</td>
+            <td class="text-secondary">X {{ c.x_mm }} · Y {{ c.y_mm }}</td>
+            <td>
+              {% if vec.get(c.oznaka) %}
+                <span class="badge text-bg-secondary">upisano: {{ vec.get(c.oznaka) }}</span>
+              {% else %}
+              <select class="form-select form-select-sm" name="ishod_{{ c.oznaka }}">
+                <option value="">— nije ocijenjeno —</option>
+                {% for i in ishodi %}<option value="{{ i }}">{{ i }}</option>{% endfor %}
+              </select>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="d-flex align-items-center gap-3 mt-3">
+      <button class="btn btn-primary">Upiši ishode</button>
+      <span class="text-secondary small">
+        Prazno = preskače se. Već upisano se ne mijenja — svaki rez je zaseban podatak.
+      </span>
+    </div>
+  </div>
+</form>
+
+{% if sazetak %}
+<div class="card card-body mt-3 small">
+  <strong class="mb-1">Stanje baze za ovaj materijal</strong>
+  {% for op, s in sazetak.items() %}
+  <div>{{ op }}: {{ s.dobro }} dobrih od {{ s.ukupno }} ·
+    debljine {{ s.debljine|join(', ') }} mm ·
+    {% if s.treba_jos %}treba još <strong>{{ s.treba_jos }}</strong> do preporuke{% else %}
+    dovoljno za preporuku{% endif %}</div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
