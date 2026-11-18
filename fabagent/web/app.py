@@ -317,6 +317,47 @@ def create_app(data_dir: str | None = None, camera_source: str | None = None) ->
     def index(request: Request):
         return page(request, "index.html", {})
 
+    # ------------------------------------------------- ucenje iz ishoda
+    @app.post("/job/ishod")
+    async def job_ishod(request: Request):
+        """Operater ocjenjuje zavrsen posao. Bez ovog zapisa nema ni tabele
+        ni modela - svaka preporuka ostaje pretpostavka."""
+        from fabagent.laser import ucenje as U
+        form = await request.form()
+        try:
+            z = U.Zapis(
+                datum="", materijal=str(form.get("materijal") or ""),
+                debljina_mm=float(form.get("debljina_mm") or 0),
+                operacija=str(form.get("operacija") or ""),
+                brzina_mm_min=float(form.get("brzina_mm_min") or 0),
+                snaga_pct=float(form.get("snaga_pct") or 0),
+                prolaza=int(form.get("prolaza") or 0),
+                interval_mm=(float(form["interval_mm"]) if form.get("interval_mm") else None),
+                ishod=str(form.get("ishod") or ""),
+                job_id=str(form.get("job_id") or ""),
+                napomena=str(form.get("napomena") or ""))
+            baza = U.Baza.ucitaj(store.ishodi_putanja)
+            baza.dodaj(z)
+        except (ValueError, TypeError) as exc:
+            return {"ok": False, "greska": str(exc)}
+        return {"ok": True, "zapisa": len(baza.zapisi),
+                "sazetak": U.sazetak(baza).get(z.materijal, {})}
+
+    @app.get("/api/preporuka")
+    def api_preporuka(materijal: str, debljina_mm: float, operacija: str):
+        from fabagent.laser import ucenje as U
+        try:
+            return U.preporuka(U.Baza.ucitaj(store.ishodi_putanja), materijal, debljina_mm, operacija)
+        except ValueError as exc:
+            return {"ima": False, "razlog": str(exc)}
+
+    @app.get("/api/ishodi")
+    def api_ishodi():
+        from fabagent.laser import ucenje as U
+        baza = U.Baza.ucitaj(store.ishodi_putanja)
+        return {"zapisa": len(baza.zapisi), "sazetak": U.sazetak(baza),
+                "min_za_preporuku": U.MIN_ZAPISA, "min_za_regresiju": U.MIN_ZAPISA_REGRESIJA}
+
     @app.get("/history", response_class=HTMLResponse)
     def history(request: Request):
         return page(request, "history.html", {"jobs": store.list()})

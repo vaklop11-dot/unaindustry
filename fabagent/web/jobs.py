@@ -51,6 +51,8 @@ class JobStore:
         root = Path(root or os.environ.get(DATA_DIR_ENV) or PROJECT_ROOT)
         self.jobs_dir = root / "jobs"
         self.production_dir = root / "production"
+        # Ishodi poslova (ucenje parametara). Jedan fajl, uz poslove.
+        self.ishodi_putanja = root / "ishodi.json"
         self.jobs_dir.mkdir(parents=True, exist_ok=True)
         self.production_dir.mkdir(parents=True, exist_ok=True)
 
