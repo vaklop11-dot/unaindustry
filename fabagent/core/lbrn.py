@@ -252,8 +252,16 @@ def parse(data: bytes, bed_height: float | None = None) -> dict:
             if key not in sources or w <= 0 or h <= 0:
                 skipped["slika bez podataka"] = skipped.get("slika bez podataka", 0) + 1
                 return
+            # LightBurn slici upisuje Y nadolje u njen vlastiti XForm, pa taj
+            # XForm cesto vec nosi negativan `d`. Ako se tome doda jos jedno
+            # okretanje, slika izadje naopako (tekst se cita naopako), dok su
+            # putanje ispravne. Zato se okretanje dodaje SAMO kad je potrebno:
+            # u SVG-u slika stoji uspravno kad je `d` pozitivan.
+            mat = _mul(flip, m)
+            if mat[3] < 0.0:
+                mat = _mul(mat, (1.0, 0.0, 0.0, -1.0, 0.0, 0.0))
             raw.append({"type": "image", "layer": cut_index(el), "src": key, "w": w, "h": h,
-                        "matrix": [round(v, 9) for v in _mul(_mul(flip, m), (1.0, 0.0, 0.0, -1.0, 0.0, 0.0))]})
+                        "matrix": [round(v, 9) for v in mat]})
             return
         if kind == "Rect":
             cmds = _rect_cmds(_f(el, "W"), _f(el, "H"), _f(el, "Cr"))

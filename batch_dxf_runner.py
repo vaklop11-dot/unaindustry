@@ -26,6 +26,7 @@ from fabagent.core import gcode as G                       # noqa: E402
 from fabagent.core.converter import dxf_to_svg             # noqa: E402
 from fabagent.core.svg_fixer import fix_svg                # noqa: E402
 from fabagent.laser import dijeljenje as DJ                 # noqa: E402
+from fabagent.laser import transformacije as TF            # noqa: E402
 from fabagent.laser.presets import get_preset               # noqa: E402
 
 
@@ -57,7 +58,8 @@ def _postavke(materijal: str) -> dict:
     return izbor
 
 
-def obradi_dxf(ime: str, podaci: bytes, materijal: str, izlaz: Path, dijeli: bool) -> dict:
+def obradi_dxf(ime: str, podaci: bytes, materijal: str, izlaz: Path, dijeli: bool,
+               operacije: list[str] | None = None) -> dict:
     red = {"fajl": ime, "status": "", "duple": 0, "poruka": ""}
     try:
         konv = dxf_to_svg(podaci, "mm")
@@ -84,6 +86,8 @@ def obradi_dxf(ime: str, podaci: bytes, materijal: str, izlaz: Path, dijeli: boo
         napisano = []
         for i, tabla in enumerate(table, 1):
             d = popravljen.design if tabla is None else DJ.dizajn_table(tabla, W, H)
+            if operacije:
+                d = TF.dizajn_transformisan(d, operacije)
             rez = G.generate(d, post, (0.0, 0.0), title=f"{ime} dio {i}")
             nc = izlaz / (Path(ime).stem + (f"_dio{i}.nc" if len(table) > 1 else ".nc"))
             nc.write_text(rez.text, encoding="utf-8")
@@ -107,6 +111,8 @@ def main() -> int:
     a.add_argument("--materijal", default="sperploca_3mm", help="kljuc iz presets.py")
     a.add_argument("--izlaz", default="izlaz/dxf_paket", help="folder za .nc fajlove")
     a.add_argument("--samo", default="", help="obradi samo fajlove ciji naziv sadrzi ovaj tekst")
+    a.add_argument("--okreni", default="", help="okreni_v | okreni_h | rot90 | rot180 | rot270, "
+                                               "vise njih odvoji zarezom")
     a.add_argument("--bez-dijeljenja", action="store_true",
                    help="ne dijeli preveliki crtez na table (tada preveliki pada)")
     arg = a.parse_args()
@@ -119,6 +125,12 @@ def main() -> int:
     if not arhive:
         print(f"GRESKA: nema nijedne .zip arhive u {p}")
         return 2
+
+    ops = [o.strip() for o in arg.okreni.split(",") if o.strip()]
+    for o in ops:
+        if o not in TF.OPERACIJE:
+            print(f"GRESKA: '{o}' nije operacija. Izbor: {', '.join(TF.OPERACIJE)}")
+            return 2
 
     izlaz = Path(arg.izlaz)
     izlaz.mkdir(parents=True, exist_ok=True)
@@ -135,7 +147,7 @@ def main() -> int:
         print(f"\n== {zp.name}  ({len(unosi)} DXF)")
         for ime, podaci in unosi:
             ukupno += 1
-            r = obradi_dxf(ime, podaci, arg.materijal, izlaz, not arg.bez_dijeljenja)
+            r = obradi_dxf(ime, podaci, arg.materijal, izlaz, not arg.bez_dijeljenja, ops)
             duplih += r["duple"]
             if r["status"] == "OK":
                 ok += 1
