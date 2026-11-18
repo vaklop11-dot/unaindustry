@@ -512,6 +512,33 @@ def fix_svg(data: bytes, filename: str = "upload.svg") -> FixResult:
     if not any(layers.values()) and not any(otvorene_po_sloju.values()):
         rep.blocking.append("nakon obrade nema nijedne putanje za laser")
 
+    # Crtez cesto izlazi izvan deklarisane velicine dokumenta: CorelDRAW i
+    # Illustrator upisu A4 u zaglavlje, a sadrzaj je veci ili pomjeren u minus.
+    # Ranije je svaka takva kontura davala "geometrija izlazi izvan dokumenta"
+    # i posao se nije mogao odobriti, iako sa crtezom nije bilo nista lose.
+    # Dokument se zato poravna po stvarnom sadrzaju: pomak u nulu i velicina
+    # po granicama geometrije. Nista se ne skalira i nista ne izostavlja.
+    svi_nizovi = [r for lst in layers.values() for r in lst] + list(open_left)
+    if svi_nizovi:
+        tacke = np.vstack([np.asarray(r, dtype=float) for r in svi_nizovi])
+        x0, y0 = float(tacke[:, 0].min()), float(tacke[:, 1].min())
+        x1, y1 = float(tacke[:, 0].max()), float(tacke[:, 1].max())
+        izlazi = (x0 < -C.GEOMETRY_EPS_MM or y0 < -C.GEOMETRY_EPS_MM
+                  or x1 > W + C.GEOMETRY_EPS_MM or y1 > H + C.GEOMETRY_EPS_MM)
+        if izlazi:
+            dx, dy = -min(0.0, x0), -min(0.0, y0)
+            if dx or dy:
+                pom = np.array([dx, dy], dtype=float)
+                layers = {k: [np.asarray(r, dtype=float) + pom for r in v] for k, v in layers.items()}
+                open_left = [np.asarray(r, dtype=float) + pom for r in open_left]
+                otvorene_po_sloju = {k: [np.asarray(r, dtype=float) + pom for r in v]
+                                     for k, v in otvorene_po_sloju.items()}
+            W = max(W, x1 + dx)
+            H = max(H, y1 + dy)
+            rep.fixes.append(
+                f"Dokument poravnat po sadrzaju: {W:.2f} x {H:.2f} mm "
+                f"(u fajlu je pisalo manje, pa je crtez izlazio izvan njega)")
+
     design = LaserDesign(W, H)
     for layer in C.LAYERS:
         ot = otvorene_po_sloju.get(layer, [])
