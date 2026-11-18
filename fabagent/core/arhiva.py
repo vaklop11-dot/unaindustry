@@ -90,7 +90,7 @@ def spisak(zip_putanja: str | Path, filter_teksta: str = "") -> dict:
     Vraca {"unosi": [...], "ukupno": n, "podrzanih": n, "preskoceno": n}
     gdje je svaki unos {"ime", "bajtova", "ext"}.
     """
-    from fabagent.core.converter import SUPPORTED_EXT
+    from fabagent.core.converter import IMAGE_EXT, SUPPORTED_EXT
 
     p = _provjeri_putanju(zip_putanja)
     if p.suffix.lower() in NEPODRZANE_ARHIVE:
@@ -125,10 +125,17 @@ def spisak(zip_putanja: str | Path, filter_teksta: str = "") -> dict:
         podrzanih += 1
         if trazi and trazi not in ime_u.lower():
             continue
-        unosi.append({"ime": ime_u, "bajtova": velicina, "ext": ext})
+        # Paketi za laser nose i produktne fotografije. One se mogu gravirati,
+        # ali NISU crtez za rezanje - ako stoje u istom spisku, operater klikne
+        # fotografiju i dobije gravuru umjesto dijelova koji se sijeku.
+        vrsta = "slika" if ext in IMAGE_EXT else "crtez"
+        unosi.append({"ime": ime_u, "bajtova": velicina, "ext": ext, "vrsta": vrsta})
 
-    unosi.sort(key=lambda x: x["ime"].lower())
+    # Crtezi prvi, fotografije na kraj.
+    unosi.sort(key=lambda x: (x["vrsta"] != "crtez", x["ime"].lower()))
+    crteza = sum(1 for u in unosi if u["vrsta"] == "crtez")
     return {"unosi": unosi, "ukupno": len(svi), "podrzanih": podrzanih,
+            "crteza": crteza, "slika": len(unosi) - crteza,
             "preskoceno": len(svi) - podrzanih, "arhiva": p.name, "putanja": str(p)}
 
 

@@ -95,11 +95,19 @@
       </p>
 
       <div class="list-group small" style="max-height:420px; overflow:auto">
+        {% if spisak.crteza is defined %}
+        <div class="list-group-item bg-dark text-secondary small py-1">
+          {{ spisak.crteza }} crteža za rezanje/graviranje
+          {% if spisak.slika %}· {{ spisak.slika }} fotografija paketa na dnu (to NISU crteži){% endif %}
+        </div>
+        {% endif %}
         {% for u in spisak.unosi %}
         <label class="list-group-item d-flex justify-content-between align-items-center gap-2">
           <span><input class="form-check-input me-2" type="radio" name="ime" value="{{ u.ime }}"
-                       {% if loop.first %}checked{% endif %}>{{ u.ime }}</span>
-          <span class="text-muted">{{ u.ext }} · {{ '%.0f'|format(u.bajtova / 1024) }} KB</span>
+                       {% if loop.first and u.vrsta == 'crtez' %}checked{% endif %}>{{ u.ime }}</span>
+          <span class="text-muted">
+            {% if u.vrsta == 'slika' %}<span class="badge text-bg-warning me-1">fotografija</span>{% endif %}
+            {{ u.ext }} · {{ '%.0f'|format(u.bajtova / 1024) }} KB</span>
         </label>
         {% else %}
         <div class="list-group-item text-muted">Nema pogotka za „{{ trazi }}".</div>
