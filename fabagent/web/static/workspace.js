@@ -368,8 +368,10 @@
   canvas._renderBackground = function (ctx) {
     const v = this.viewportTransform, z = v[0], W = this.width, H = this.height;
     const sx = (x) => v[4] + x * z, sy = (y) => v[5] + y * z;
+    // Radna povrsina je BIJELA: crna gravura i crni obrisi se na tamnoj
+    // podlozi nisu vidjeli. Okolina ostaje tamna da se ploca jasno odvaja.
     ctx.fillStyle = "#1b1b1b"; ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = "#2b2b2b"; ctx.fillRect(sx(0), sy(0), BW * z, BH * z);
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(sx(0), sy(0), BW * z, BH * z);
     const minor = gridStep(8, [1, 5, 10, 50, 100]), major = gridStep(50, [5, 10, 20, 50, 100, 200]);
     ctx.lineWidth = 1;
     const lines = (step, color) => {
@@ -378,8 +380,8 @@
       for (let y = 0; y <= BH + 1e-6; y += step) { const py = Math.round(sy(BH - y)) + 0.5; ctx.moveTo(sx(0), py); ctx.lineTo(sx(BW), py); }
       ctx.stroke();
     };
-    lines(minor, "#343434"); lines(major, "#484848");
-    ctx.strokeStyle = "#9a9a9a"; ctx.strokeRect(Math.round(sx(0)) + 0.5, Math.round(sy(0)) + 0.5, BW * z, BH * z);
+    lines(minor, "#e3e3e3"); lines(major, "#c2c2c2");   // mreza na bijelom
+    ctx.strokeStyle = "#555555"; ctx.strokeRect(Math.round(sx(0)) + 0.5, Math.round(sy(0)) + 0.5, BW * z, BH * z);
     ctx.fillStyle = "#3fbf5f"; ctx.fillRect(sx(0) - 4, sy(BH) - 4, 8, 8);            // ishodiste masine (0, 0) dolje-lijevo
   };
   canvas.on("after:render", (opt) => {
