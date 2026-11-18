@@ -56,9 +56,9 @@ def detect_format(filename: str) -> str:
         mb = C.UPLOAD_MAX_BYTES // (1024 * 1024)
         raise InvalidParam(
             f"fajl: '{ext}' je arhiva, a ne crtez. "
-            + ("ZIP se ne salje kroz ovu formu - otvori stranicu 'Arhive', ona ga cita "
-               "sa diska bez raspakivanja i iz njega se bira jedan crtez."
-               if ext == ".zip" else
+            + ("Arhiva se ne salje kroz ovu formu - otvori stranicu 'Arhive', ona je cita "
+               "sa diska bez raspakivanja i iz nje se bira jedan crtez."
+               if ext in (".zip", ".tar", ".gz", ".bz2", ".xz") else
                f"Prepakuj je u .zip pa je otvori kroz stranicu 'Arhive', ili prilozi "
                f"jedan fajl iz nje ({', '.join(SUPPORTED_EXT)}).")
             + f" Granica za slanje kroz formu je {mb} MB.")

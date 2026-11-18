@@ -15,6 +15,7 @@ tudje biblioteke je tacno ono sto smo upravo izbacili zbog licenci.
 
 from __future__ import annotations
 
+import tarfile
 import zipfile
 from pathlib import Path
 
@@ -23,7 +24,23 @@ from fabagent.core.errors import InvalidParam, OutputError
 
 # Arhive koje umijemo otvoriti, i one koje ne umijemo ali ih treba imenovati.
 ZIP_EXT = (".zip",)
-NEPODRZANE_ARHIVE = (".rar", ".7z", ".tar", ".gz", ".bz2", ".xz")
+# TAR i njegove kompresije cita standardna biblioteka (modul tarfile), pa za
+# njih ne treba nijedna tudja biblioteka ni licenca.
+TAR_EXT = (".tar", ".tgz", ".tbz", ".tbz2", ".txz")
+TAR_SLOZENI = (".tar.gz", ".tar.bz2", ".tar.xz")
+# RAR je zatvoren format (RARLAB), a 7z trazi biblioteku pod copyleft licencom.
+# Zato se oni ne otvaraju - prepakivanje u .zip je jedini cist put.
+NEPODRZANE_ARHIVE = (".rar", ".7z")
+
+
+def _vrsta(p: Path) -> str:
+    """'zip' | 'tar' | '' - po imenu fajla, ne po sadrzaju."""
+    ime = p.name.lower()
+    if ime.endswith(ZIP_EXT):
+        return "zip"
+    if ime.endswith(TAR_SLOZENI) or ime.endswith(TAR_EXT) or ime.endswith((".gz", ".bz2", ".xz")):
+        return "tar"
+    return ""
 
 # Najveci pojedinacni crtez koji se vadi iz arhive. Ista granica kao za upload:
 # ako nesto ne bi proslo kroz formu, nema razloga da prodje ni ovuda.
@@ -49,13 +66,20 @@ def arhive_u_folderu(folder: str | Path, dubina: int = 1) -> list[dict]:
     if not p.is_dir():
         raise InvalidParam(f"folder: '{p}' nije folder")
     out = []
+    maske = ["*.zip", "*.tar", "*.tgz", "*.tbz", "*.tbz2", "*.txz",
+             "*.tar.gz", "*.tar.bz2", "*.tar.xz"]
+    vidjeno = set()
     for nivo in range(dubina):
-        obrazac = "/".join(["*"] * nivo + ["*.zip"]) if nivo else "*.zip"
-        for f in p.glob(obrazac):
-            try:
-                out.append({"ime": f.name, "putanja": str(f), "bajtova": f.stat().st_size})
-            except OSError:
-                continue
+        for maska in maske:
+            obrazac = "/".join(["*"] * nivo + [maska]) if nivo else maska
+            for f in p.glob(obrazac):
+                if str(f) in vidjeno:
+                    continue
+                vidjeno.add(str(f))
+                try:
+                    out.append({"ime": f.name, "putanja": str(f), "bajtova": f.stat().st_size})
+                except OSError:
+                    continue
     out.sort(key=lambda x: x["ime"].lower())
     return out
 
@@ -72,30 +96,36 @@ def spisak(zip_putanja: str | Path, filter_teksta: str = "") -> dict:
     if p.suffix.lower() in NEPODRZANE_ARHIVE:
         raise InvalidParam(f"arhiva: '{p.suffix}' se ne moze otvoriti ovdje - "
                            f"prepakuj je u .zip pa pokusaj ponovo")
-    if p.suffix.lower() not in ZIP_EXT:
-        raise InvalidParam(f"arhiva: '{p.suffix}' nije ZIP")
+    vrsta = _vrsta(p)
+    if not vrsta:
+        raise InvalidParam(f"arhiva: '{p.suffix}' nije arhiva koju citam "
+                           f"(idu .zip, .tar, .tar.gz, .tgz, .tar.bz2, .tar.xz)")
 
     try:
-        with zipfile.ZipFile(p) as z:
-            svi = z.infolist()
-    except zipfile.BadZipFile as exc:
-        raise InvalidParam(f"arhiva: ZIP je ostecen ili nije ZIP ({exc})") from None
+        if vrsta == "zip":
+            with zipfile.ZipFile(p) as z:
+                svi = [(i.filename, i.file_size, i.is_dir()) for i in z.infolist()]
+        else:
+            with tarfile.open(p, "r:*") as t:
+                svi = [(m.name, m.size, not m.isfile()) for m in t.getmembers()]
+    except (zipfile.BadZipFile, tarfile.TarError) as exc:
+        raise InvalidParam(f"arhiva: '{p.name}' je ostecena ili nije arhiva ({exc})") from None
     except OSError as exc:
         raise InvalidParam(f"arhiva: ne mogu otvoriti '{p.name}' ({exc})") from None
 
     trazi = (filter_teksta or "").strip().lower()
     unosi = []
     podrzanih = 0
-    for info in svi:
-        if info.is_dir():
+    for ime_u, velicina, je_folder in svi:
+        if je_folder:
             continue
-        ext = Path(info.filename).suffix.lower()
+        ext = Path(ime_u).suffix.lower()
         if ext not in SUPPORTED_EXT:
             continue
         podrzanih += 1
-        if trazi and trazi not in info.filename.lower():
+        if trazi and trazi not in ime_u.lower():
             continue
-        unosi.append({"ime": info.filename, "bajtova": info.file_size, "ext": ext})
+        unosi.append({"ime": ime_u, "bajtova": velicina, "ext": ext})
 
     unosi.sort(key=lambda x: x["ime"].lower())
     return {"unosi": unosi, "ukupno": len(svi), "podrzanih": podrzanih,
@@ -110,7 +140,23 @@ def izvadi(zip_putanja: str | Path, ime: str) -> tuple[str, bytes]:
     spisku nema.
     """
     p = _provjeri_putanju(zip_putanja)
+    mb = MAX_UNOS_BAJTOVA // (1024 * 1024)
     try:
+        if _vrsta(p) == "tar":
+            with tarfile.open(p, "r:*") as t:
+                try:
+                    clan = t.getmember(ime)
+                except KeyError:
+                    raise InvalidParam(f"u arhivi '{p.name}' nema fajla '{ime}'") from None
+                if not clan.isfile():
+                    raise InvalidParam(f"'{ime}' nije obican fajl")
+                if clan.size > MAX_UNOS_BAJTOVA:
+                    raise InvalidParam(f"'{ime}' je {clan.size / 1024 / 1024:.1f} MB, "
+                                       f"a granica je {mb} MB")
+                tok = t.extractfile(clan)
+                if tok is None:
+                    raise InvalidParam(f"'{ime}' se ne moze procitati iz arhive")
+                return Path(clan.name).name, tok.read()
         with zipfile.ZipFile(p) as z:
             try:
                 info = z.getinfo(ime)
@@ -119,12 +165,11 @@ def izvadi(zip_putanja: str | Path, ime: str) -> tuple[str, bytes]:
             if info.is_dir():
                 raise InvalidParam(f"'{ime}' je folder, ne fajl")
             if info.file_size > MAX_UNOS_BAJTOVA:
-                mb = MAX_UNOS_BAJTOVA // (1024 * 1024)
                 raise InvalidParam(f"'{ime}' je {info.file_size / 1024 / 1024:.1f} MB, "
                                    f"a granica je {mb} MB")
             data = z.read(info)
-    except zipfile.BadZipFile as exc:
-        raise InvalidParam(f"arhiva: ZIP je ostecen ({exc})") from None
+    except (zipfile.BadZipFile, tarfile.TarError) as exc:
+        raise InvalidParam(f"arhiva: '{p.name}' je ostecena ({exc})") from None
     except OSError as exc:
         raise OutputError(f"ne mogu procitati iz arhive: {exc}") from None
     return Path(info.filename).name, data
