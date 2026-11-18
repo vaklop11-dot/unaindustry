@@ -18,7 +18,7 @@
   const zoom = (sizePx - 2) / Math.max(W, H);
 
   const canvas = new fabric.Canvas("editor-canvas", {width: W * zoom + 2, height: H * zoom + 2,
-    selection: true, preserveObjectStacking: true, backgroundColor: "#2b2b2b"});
+    selection: true, preserveObjectStacking: true, backgroundColor: "#ffffff"});
   canvas.setViewportTransform([zoom, 0, 0, zoom, 1, 1]);
 
   // mreza stola (10 mm) - nije objekat rasporeda
