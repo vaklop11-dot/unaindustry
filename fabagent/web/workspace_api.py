@@ -44,6 +44,21 @@ def _shrink_for_trace(raw: bytes) -> bytes:
 
 
 def register(app, page) -> None:
+    def _listovi_posla(job_id: str) -> list[str]:
+        """URL-ovi svih SVG listova jednog posla, redom.
+
+        Posao iz razgovora ili iz arhive moze biti razdijeljen na vise ploca.
+        Bez ovoga operater zavrsi razgovor i nema gdje dalje - crtez ostane u
+        istoriji, a radna povrsina prazna.
+        """
+        from fabagent.web.app import store                      # noqa: PLC0415
+        job = store.get(job_id)
+        listovi = job.get("sheets")
+        if not listovi:
+            svgs = [n for n in job.get("outputs", []) if n.endswith(".svg")]
+            listovi = [{"svg": n} for n in svgs]
+        return [f"/jobs/{job_id}/{sh['svg']}" for sh in listovi if sh.get("svg")]
+
     @app.get("/radni", response_class=HTMLResponse)
     def workspace_page(request: Request):
         lo, hi = (v * 60.0 for v in C.LAYER_SPEED_RANGE_MM_S)
@@ -54,6 +69,22 @@ def register(app, page) -> None:
                           "passes": list(C.LAYER_PASSES_RANGE), "interval": list(C.LAYER_INTERVAL_RANGE_MM)},
                "textHeight": list(W.TEXT_HEIGHT_RANGE_MM), "traceThreshold": TRACE_THRESHOLD_DEFAULT,
                "jogFeed": C.GRBL_TRAVEL_FEED_MM_MIN}
+        posao = (request.query_params.get("job") or "").strip()
+        if posao:
+            try:
+                listovi = _listovi_posla(posao)
+            except Exception:                                   # noqa: BLE001
+                listovi = []                                    # posao obrisan ili bez SVG-a
+            if listovi:
+                try:
+                    n = int(request.query_params.get("list") or 1)
+                except ValueError:
+                    n = 1
+                n = min(max(n, 1), len(listovi))
+                cfg["posao"] = posao
+                cfg["listovi"] = listovi
+                cfg["list"] = n
+                cfg["ucitaj"] = listovi[n - 1]
         return page(request, "workspace.html", {"ws_cfg": cfg})
 
     @app.get("/api/ws/fonts")

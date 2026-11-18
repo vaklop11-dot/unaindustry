@@ -14,7 +14,8 @@
 {% if zadnji_posao %}
 <div class="alert alert-success small d-flex flex-wrap gap-2 align-items-center" role="alert">
   <span>{{ t("Zadnji napravljen posao:") }} <strong>{{ zadnji_posao.slug }}</strong></span>
-  <a class="btn btn-sm btn-danger ms-auto" href="/machine?job={{ zadnji_posao.job_id }}">🔴 {{ t("Otvori na laseru") }}</a>
+  <a class="btn btn-sm btn-primary ms-auto" href="/radni?job={{ zadnji_posao.job_id }}">🧩 {{ t("Radna površina") }}</a>
+  <a class="btn btn-sm btn-danger" href="/machine?job={{ zadnji_posao.job_id }}">🔴 {{ t("Otvori na laseru") }}</a>
   <a class="btn btn-sm btn-outline-secondary" href="/history/{{ zadnji_posao.job_id }}">{{ t("Pregled") }}</a>
 </div>
 {% endif %}

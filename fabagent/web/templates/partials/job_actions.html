@@ -16,6 +16,7 @@
   {% endif %}
   <a class="btn btn-outline-dark btn-lg" href="/jobs/{{ job.job_id }}/uputstvo" id="btn-uputstvo">Radni nalog</a>
   {% if job.type in ('laser', 'upload', 'raster') and not job.blocking %}
+  <a class="btn btn-primary btn-lg" href="/radni?job={{ job.job_id }}" id="btn-radni">🧩 Radna površina</a>
   <a class="btn btn-outline-danger btn-lg" href="/machine?job={{ job.job_id }}" id="btn-machine">🔴 Pošalji na laser</a>
   {% endif %}
   {% if job.type in ('laser', 'upload') and not job.blocking and (job.sheets|default([None]))|length == 1 %}

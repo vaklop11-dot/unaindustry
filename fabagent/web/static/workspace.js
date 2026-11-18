@@ -1109,9 +1109,26 @@
   zoomFit();
   setTool("select");
   loadFonts().catch(() => {});        // lista fontova se cita unaprijed da alat Tekst ne ceka
-  let saved = null;
-  try { saved = JSON.parse(localStorage.getItem("fabagent.radni") || "null"); } catch (e) { saved = null; }
-  if (saved && saved.app === "FabAgent" && Array.isArray(saved.objects) && saved.objects.length) {
-    restore(saved, () => { S.undo = []; S.redo = []; commit(); say("Vraćen je posljednji crtež (automatski sačuvan u ovom browseru)."); });
-  } else commit();
+  // Posao otvoren sa /radni?job=<id>: crtez iz razgovora, uploada ili arhive
+  // se ucitava ovdje, da operater odmah vidi sta ce se raditi i odavde se
+  // povezuje na masinu. Bez ovoga se lanac razgovor -> radna povrsina -> laser
+  // prekidao i crtez je ostajao samo u istoriji.
+  if (CFG && CFG.ucitaj) {
+    fetch(CFG.ucitaj)
+      .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
+      .then((t) => importSvgText(t, {}))
+      .then(() => {
+        S.undo = []; S.redo = []; commit(); zoomFit();
+        const uk = (CFG.listovi || []).length;
+        say(uk > 1 ? `Učitan posao, ploča ${CFG.list} od ${uk}. Ostale ploče: dugme "Ploča" gore desno.`
+                   : "Posao je učitan. Poveži se na laser i pokreni.", "ok");
+      })
+      .catch((e) => say("Posao se nije mogao učitati: " + e.message, "err"));
+  } else {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem("fabagent.radni") || "null"); } catch (e) { saved = null; }
+    if (saved && saved.app === "FabAgent" && Array.isArray(saved.objects) && saved.objects.length) {
+      restore(saved, () => { S.undo = []; S.redo = []; commit(); say("Vraćen je posljednji crtež (automatski sačuvan u ovom browseru)."); });
+    } else commit();
+  }
 })();

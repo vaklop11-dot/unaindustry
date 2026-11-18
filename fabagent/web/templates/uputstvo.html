@@ -63,6 +63,7 @@
    je gubio vezu sa poslom. Stranica posla je /history/<id>. #}
 <p class="mt-3 d-flex flex-wrap gap-2">
   <a class="btn btn-outline-secondary btn-sm" href="/history/{{ nalog.job_id }}">Nazad na posao</a>
+  <a class="btn btn-primary btn-sm" href="/radni?job={{ nalog.job_id }}">🧩 Radna površina</a>
   <a class="btn btn-danger btn-sm" href="/machine?job={{ nalog.job_id }}">🔴 Otvori na laseru</a>
   <a class="btn btn-outline-secondary btn-sm" href="/razgovor">Razgovor</a>
 </p>
