@@ -169,7 +169,8 @@ def register(app, store, page, error_view, preview_ctx) -> None:
             sheet = body.get("sheet", 1)
             if not isinstance(sheet, int):
                 raise InvalidParam("sheet mora biti cijeli broj")
-            res = store.make_gcode(job_id, offset, sheet=sheet, frame=frame)
+            sidro = str(body.get("sidro") or "").strip()
+            res = store.make_gcode(job_id, offset, sheet=sheet, frame=frame, sidro=sidro)
         except FabError as exc:
             return _err(exc)
         out = {"ok": True, "frame": frame, "stats": res["stats"], "lines": res["text"].count("\n")}

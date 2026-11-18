@@ -262,6 +262,8 @@ def generate(design, settings: dict[str, LayerSetting], offset: tuple[float, flo
     w.lines += [f"; FabAgent G-code - {title}".rstrip(" -"),
                 f"; masina: {C.LASER_MACHINE_NAME}, ishodiste {C.MACHINE_ORIGIN}, S max {C.GRBL_S_MAX}",
                 f"; pomak dizajna na stolu: X{ox:g} Y{oy:g} mm (gornji lijevi ugao dokumenta)",
+                "; redoslijed: rupe prije vanjskog obrisa, pa najbliza sljedeca kontura "
+                "(optimizacija putanje)",
                 "G21 ; mm", "G90 ; apsolutno", "M5", f"{C.GRBL_LASER_MODE_CMD} S0"]
     used = []
     izgorene: set = set()
@@ -293,6 +295,7 @@ def generate(design, settings: dict[str, LayerSetting], offset: tuple[float, flo
     w.lines += ["M5 ; laser ugasen", "G0 X0 Y0", "M2"]
     travel_s = w.travel_mm / (C.GRBL_TRAVEL_FEED_MM_MIN / 60.0)
     stats = {"lines": len(w.lines), "layers": used, "burn_mm": round(w.burn_mm, 1),
+             "redoslijed": "rupe prije obrisa, najbliza sljedeca",
              "duple_preskocene": preskoceno,
              "travel_mm": round(w.travel_mm, 1), "time_s": round(w.burn_s + travel_s, 1),
              "offset_mm": [ox, oy], "settings": {k: settings[k].as_dict() for k in used}}

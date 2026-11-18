@@ -46,6 +46,30 @@ def _now() -> datetime:
     return datetime.now().replace(microsecond=0)
 
 
+def _ploce_ako_ne_stane(res) -> list:
+    """Ako crtez ne stane na sto, vrati listu dizajna po plocama; inace [].
+
+    Koristi `laser/dijeljenje.py`: komad = vanjska kontura sa svime unutar nje.
+    Geometrija se ne sijece i nista se ne skalira.
+    """
+    from fabagent.core import config as _C
+    W, H = _C.LASER_WORK_AREA_MM
+    if res.width_mm <= W + 1e-6 and res.height_mm <= H + 1e-6:
+        return [], []
+    from fabagent.laser import dijeljenje as _DJ
+    otv = {}
+    for o in (res.open_paths or []):
+        otv.setdefault("CUT", []).append(o)
+    komadi = _DJ.komadi(res.layers, otv)
+    if not komadi:
+        return [], []
+    table, prevelici = _DJ.rasporedi(komadi, float(W), float(H))
+    # Komad koji ne stane ni sam se NE skaliva i NE sijece - prijavljuje se
+    # imenom i mjerama. Tiho ispustanje bi znacilo da operater izreze posao
+    # kojem fali dio, a to se vidi tek na materijalu.
+    return [_DJ.dizajn_table(t, float(W), float(H)) for t in table], prevelici
+
+
 class JobStore:
     def __init__(self, root: str | os.PathLike | None = None):
         root = Path(root or os.environ.get(DATA_DIR_ENV) or PROJECT_ROOT)
@@ -166,6 +190,16 @@ class JobStore:
         conv = convert(filename, data, threshold=threshold, width_mm=width_mm, dxf_units=dxf_units, trace=trace)
         res = fix_svg(conv.svg, Path(filename).stem + ".svg")
         rep = res.report
+        # Crtez veci od stola nije greska nego posao za vise ploca. Komadi se
+        # NE sijeku - svaki ostaje cijel, samo se rasporede na onoliko ploca
+        # koliko treba. Bez ovoga je svaki paket iz arhive zavrsavao kao
+        # "dokument je veci od radne povrsine" i nije se mogao odobriti.
+        ploce, prevelici = _ploce_ako_ne_stane(res)
+        if prevelici:
+            rep.blocking.append(
+                f"{len(prevelici)} komad(a) ne stane na radnu povrsinu ni sam: "
+                + ", ".join(f"{k.sirina:.0f}x{k.visina:.0f} mm" for k in prevelici[:5])
+                + " - takav komad se ne moze rezati na ovoj masini bez smanjivanja crteza")
         rep.fixes[:0] = [f"Konverzija {conv.source_format.upper()} -> SVG: {n}" for n in conv.notes]
         rep.blocking[:0] = list(conv.blocking)
         if res.layers["CUT"] and preset.cut is None:
@@ -213,8 +247,31 @@ class JobStore:
                 if original_view.endswith(".pdf"):           # PDF sa slikom se ne moze prikazati kao <img>
                     original_view = bitmap_view
             design_for_stats = res.design
-            outputs, renders = [], []
-            if res.production_ready and not rep.blocking:
+            outputs, renders, sheets = [], [], []
+            if ploce:
+                from fabagent.laser.svg_builder import design_to_svg
+                sheets = []
+                for i, d_ploca in enumerate(ploce, 1):
+                    ime = f"{slug}_ploca{i}.svg"
+                    (job_dir / ime).write_text(
+                        design_to_svg(d_ploca, f"{slug} ploca {i}",
+                                      f"FabAgent: ploca {i} od {len(ploce)}"),
+                        encoding="utf-8")
+                    t_i = estimate_time(d_ploca, preset)
+                    sheets.append({"svg": ime, "png": None,
+                                   "document_mm": {"width": round(d_ploca.width, 4),
+                                                   "height": round(d_ploca.height, 4)},
+                                   "time_s": None if t_i is None else t_i["total"]})
+                    outputs.append(ime)
+                shown = outputs[0]
+                design_for_stats = ploce[0]
+                times = estimate_time(ploce[0], preset)
+                rep.blocking = [b for b in rep.blocking if "radne povrsine" not in b]
+                rep.fixes.append(f"Crtez je veci od stola: razdijeljen na {len(ploce)} ploce "
+                                 f"{C.LASER_WORK_AREA_MM[0]:g} x {C.LASER_WORK_AREA_MM[1]:g} mm, "
+                                 f"bez sjecenja komada")
+                renders = []
+            elif res.production_ready and not rep.blocking:
                 params = ValidatedParams("svg_upload", {"fajl": filename, "materijal": materijal})
                 times = estimate_time(res.design, preset)
                 metadata = {
@@ -255,8 +312,10 @@ class JobStore:
                            "threshold": threshold, "width_mm": width_mm, "dxf_units": dxf_units,
                            "trace_raw": {k: v for k, v in (trace or {}).items() if v not in (None, "")},
                            "trace_options": conv.trace_options},
-            "sheets": [{"svg": shown, "png": None, "document_mm": {"width": res.width_mm, "height": res.height_mm},
-                        "time_s": None if times is None else times["total"]}],
+            "sheets": (sheets if ploce else
+                       [{"svg": shown, "png": None,
+                         "document_mm": {"width": res.width_mm, "height": res.height_mm},
+                         "time_s": None if times is None else times["total"]}]),
             "preset": preset.key, "preset_name": preset.name, "preset_verified": preset.verified,
             "warnings": warnings, "fix_report": rep.as_dict(), "blocking": list(rep.blocking),
             "estimates": {"vrijeme_s": None if times is None else times["total"], "masa_g": None},
@@ -656,8 +715,41 @@ class JobStore:
                 pj.write_text(json.dumps(job, ensure_ascii=False, indent=2), encoding="utf-8")
         return rec
 
+    SIDRA = ("dolje-lijevo", "dolje-sredina", "dolje-desno",
+             "sredina-lijevo", "sredina", "sredina-desno",
+             "gore-lijevo", "gore-sredina", "gore-desno")
+
+    @staticmethod
+    def _pomak_po_sidru(des, sidro: str, tacka) -> tuple:
+        """Pomak tako da zadano SIDRO crteza padne na zadanu tacku stola.
+
+        Kao "Job Origin" u LightBurn-u: operater bira hoce li zadana tacka biti
+        donji lijevi ugao posla, sredina, gornji desni... Ranije je crtez uvijek
+        isao gornjim lijevim uglom dokumenta i operater je racunao sam.
+        """
+        import numpy as _np
+
+        from fabagent.core.errors import InvalidParam as _IP
+        if sidro not in JobStore.SIDRA:
+            raise _IP(f"sidro: '{sidro}' nije dozvoljeno, izbor: {list(JobStore.SIDRA)}")
+        prsteni = ([r for it in des.items for r in it.rings]
+                   + [o for it in des.items for o in it.otvorene])
+        if not prsteni:
+            return tuple(tacka)
+        t = _np.vstack([_np.asarray(r, dtype=float) for r in prsteni])
+        x0, y0 = float(t[:, 0].min()), float(t[:, 1].min())
+        x1, y1 = float(t[:, 0].max()), float(t[:, 1].max())
+        if sidro == "sredina":
+            vert = horiz = "sredina"
+        else:
+            vert, _, horiz = sidro.partition("-")
+        px = {"lijevo": x0, "sredina": (x0 + x1) / 2.0, "desno": x1}[horiz]
+        # Y u dokumentu raste nadolje, a na stolu nagore: "dolje" je veci Y.
+        py = {"gore": y0, "sredina": (y0 + y1) / 2.0, "dolje": y1}[vert]
+        return (float(tacka[0]) - px, float(tacka[1]) - py)
+
     def make_gcode(self, job_id: str, offset, sheet: int = 1, frame: bool = False,
-                   frame_speed_mm_s: float | None = None) -> dict:
+                   frame_speed_mm_s: float | None = None, sidro: str = "") -> dict:
         """G-code za job (ploca `sheet`). Pomak je obavezan osim za raspored na cijelom stolu."""
         import numpy as np
 
@@ -707,6 +799,8 @@ class JobStore:
             if not (1 <= sheet <= len(designs)):
                 raise InvalidParam(f"ploca: {sheet} ne postoji (job ima {len(designs)})")
             des = designs[sheet - 1]
+            if sidro:
+                offset = self._pomak_po_sidru(des, sidro, offset or (0.0, 0.0))
             if frame:
                 speed = frame_speed_mm_s or min(s.speed_mm_s for s in settings.values())
                 res = G.frame_gcode(des, offset, speed)

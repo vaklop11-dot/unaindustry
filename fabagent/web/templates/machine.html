@@ -91,6 +91,21 @@
           <div class="col-sm-4"><label class="form-label small mb-0" for="m-y">Pozicija Y (mm) <span class="text-danger">*</span></label>
             <input class="form-control form-control-sm" type="number" step="0.1" id="m-y" placeholder="obavezno"></div>
           <div class="col-12 small text-muted">X/Y = gornji lijevi ugao dizajna mjereno od gornjeg lijevog ugla stola. Ili ga postavi u <a href="/editor/{{ job.job_id }}">editoru</a>.</div>
+          <div class="col-sm-4"><label class="form-label small mb-0" for="m-sidro">Početna tačka posla</label>
+            <select class="form-select form-select-sm" id="m-sidro">
+              <option value="">gornji lijevi ugao dokumenta (zadano)</option>
+              <option value="dolje-lijevo">dolje lijevo</option>
+              <option value="dolje-sredina">dolje sredina</option>
+              <option value="dolje-desno">dolje desno</option>
+              <option value="sredina-lijevo">sredina lijevo</option>
+              <option value="sredina">sredina</option>
+              <option value="sredina-desno">sredina desno</option>
+              <option value="gore-lijevo">gore lijevo</option>
+              <option value="gore-sredina">gore sredina</option>
+              <option value="gore-desno">gore desno</option>
+            </select></div>
+          <div class="col-12 small text-muted">Početna tačka bira KOJI dio crteža pada na X/Y koje si upisao
+            — isto kao "Job Origin" u LightBurn-u.</div>
           {% endif %}
           {% if sheet_count > 1 %}
           <div class="col-sm-4"><label class="form-label small mb-0" for="m-sheet">Ploča</label>

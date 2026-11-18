@@ -158,6 +158,7 @@
       body.x = parseFloat(x); body.y = parseFloat(y);
     }
     if ($("m-sheet")) body.sheet = parseInt($("m-sheet").value, 10);
+    if ($("m-sidro") && $("m-sidro").value) body.sidro = $("m-sidro").value;
     return body;
   }
   async function fetchGcode(frame) {
