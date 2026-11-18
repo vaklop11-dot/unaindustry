@@ -124,11 +124,23 @@ class Baza:
                 if z.materijal == materijal and z.operacija == operacija and z.ishod != "dobro"]
         izgorjelo = [z for z in lose if z.ishod in ("izgorjelo", "neuredno")]
         slabo = [z for z in lose if z.ishod == "nije_presjeklo"]
+        def _naj(zapisi, kljuc, smjer):
+            """Granicni zapis sa SVIM parametrima, da se ne mijesa uzrok.
+
+            Rani oblik je vracao samo broj, pa je ispadalo "nije sjeklo na
+            100 % i ispod" i kad je neuspjeh bio zbog prevelike brzine.
+            """
+            if not zapisi:
+                return None
+            z = (max if smjer == "max" else min)(zapisi, key=lambda x: getattr(x, kljuc))
+            return {"snaga_pct": z.snaga_pct, "brzina_mm_min": z.brzina_mm_min,
+                    "prolaza": z.prolaza, "ishod": z.ishod}
+
         return {
-            "gori_iznad_snage": min((z.snaga_pct for z in izgorjelo), default=None),
-            "ne_sijece_ispod_snage": max((z.snaga_pct for z in slabo), default=None),
-            "gori_ispod_brzine": max((z.brzina_mm_min for z in izgorjelo), default=None),
-            "ne_sijece_iznad_brzine": min((z.brzina_mm_min for z in slabo), default=None),
+            "najniza_snaga_koja_je_gorjela": _naj(izgorjelo, "snaga_pct", "min"),
+            "najvisa_snaga_koja_nije_presjekla": _naj(slabo, "snaga_pct", "max"),
+            "najveca_brzina_koja_je_gorjela": _naj(izgorjelo, "brzina_mm_min", "max"),
+            "najmanja_brzina_koja_nije_presjekla": _naj(slabo, "brzina_mm_min", "min"),
         }
 
 

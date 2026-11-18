@@ -198,6 +198,45 @@ def _preset_vrijednost(n: A.Nalog, sloj: str, polje: str):
     return getattr(op, PRESET_POLJE[polje], None)
 
 
+def _iz_iskustva(n, operacija: str) -> str:
+    """Sta kaze baza stvarnih ishoda (laser/ucenje.py), ako je ima.
+
+    Preset je jedno izmjereno stanje. Baza raste sa svakim ocijenjenim rezom,
+    pa asistent ovdje kaze i sta pokazuju POSLJEDNJI stvarni rezultati - ili
+    posteno kaze da ih jos nema dovoljno.
+    """
+    try:
+        from pathlib import Path
+
+        from fabagent.laser import ucenje as U
+        p = _preset(n)
+        if p is None:
+            return ""
+        korijen = Path(__file__).resolve().parents[2]
+        baza = U.Baza.ucitaj(korijen / "ishodi.json")
+        if not baza.zapisi:
+            return ""
+        deb = float(getattr(p, "thickness_mm", 0) or 0) or 3.0
+        r = U.preporuka(baza, p.key, deb, operacija)
+    except Exception:                                   # noqa: BLE001
+        return ""
+    if not r.get("ima"):
+        return r.get("razlog", "")
+    g = r.get("granice") or {}
+    dio = [f"Iz tvojih ishoda ({r['osnov']} ocijenjenih rezova, metoda {r['metoda']}): "
+           f"{_g(r['brzina_mm_min'])} mm/min, {_g(r['snaga_pct'])} %, {r['prolaza']} prolaza."]
+    gor = g.get("najniza_snaga_koja_je_gorjela")
+    if gor:
+        dio.append(f"Gorjelo je pri {_g(gor['snaga_pct'])} % i {_g(gor['brzina_mm_min'])} mm/min.")
+    sla = g.get("najvisa_snaga_koja_nije_presjekla")
+    if sla:
+        dio.append(f"Nije presjeklo ni pri {_g(sla['snaga_pct'])} % "
+                   f"i {_g(sla['brzina_mm_min'])} mm/min.")
+    if r.get("upozorenje"):
+        dio.append(r["upozorenje"])
+    return " ".join(dio)
+
+
 # ---------------------------------------------------------------------- znanje
 def _znanje_razmak(stanje: Stanje) -> str:
     n = nalog(stanje)
@@ -234,6 +273,9 @@ def _znanje_brzina(stanje: Stanje) -> str:
             red.append(f"Preset za {SLOJ_IME[sloj]}: {_g(v)} mm/s = {_g(v * 60)} mm/min.")
     red.append("Presporo pregori, prebrzo ne odnese dovoljno. Brzina i snaga se "
                "mjere zajedno, test-gridom.")
+    iskustvo = _iz_iskustva(n, "rez")
+    if iskustvo:
+        red.append(iskustvo)
     return " ".join(red)
 
 
@@ -248,6 +290,9 @@ def _znanje_snaga(stanje: Stanje) -> str:
         if v is not None:
             red.append(f"Preset za {SLOJ_IME[sloj]}: {_g(v)} % "
                        f"(S{int(round(float(v) / 100.0 * C.GRBL_S_MAX))}).")
+    iskustvo = _iz_iskustva(n, "rez")
+    if iskustvo:
+        red.append(iskustvo)
     return " ".join(red)
 
 
@@ -261,6 +306,9 @@ def _znanje_prolazi(stanje: Stanje) -> str:
             red.append(f"Preset za {SLOJ_IME[sloj]}: {v}.")
     red.append("Dva slabija prolaza daju cistiji rez i manje pregorjelu ivicu od "
                "jednog jakog, ali traju duze.")
+    iskustvo = _iz_iskustva(n, "rez")
+    if iskustvo:
+        red.append(iskustvo)
     return " ".join(red)
 
 
