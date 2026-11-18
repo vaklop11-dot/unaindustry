@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Test mreža materijala{% endblock %}
+{% block content %}
+<h1 class="h4 mb-1">🔲 Test mreža materijala</h1>
+<p class="text-muted small mb-3">
+  Red = <strong>snaga</strong>, kolona = <strong>brzina</strong>. Svaki kvadratić se izvodi sa svojim
+  parametrima, pa se na jednoj pločici vidi gdje počinje da gori a gdje još ne siječe.
+  Ishod svake ćelije upisuješ poslije, i od toga asistent uči.
+  <strong>Laser se ne pokreće — fajl se samo zapiše, Start pritiskaš ti.</strong>
+</p>
+
+{% if banner %}{{ banner|safe }}{% endif %}
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <form method="post" action="/test-mreza" class="card card-body">
+      <div class="mb-2">
+        <label class="form-label small mb-1">Materijal</label>
+        <select class="form-select form-select-sm" name="materijal">
+          {% for m in materijali %}
+          <option value="{{ m }}" {% if unos and unos.materijal == m %}selected{% endif %}>{{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="row g-2 mb-2">
+        <div class="col-6">
+          <label class="form-label small mb-1">Debljina (mm)</label>
+          <input class="form-control form-control-sm" name="debljina_mm"
+                 value="{{ unos.debljina_mm if unos else '' }}" placeholder="npr. 3">
+        </div>
+        <div class="col-6">
+          <label class="form-label small mb-1">Prolaza po kvadratiću</label>
+          <input class="form-control form-control-sm" name="prolaza"
+                 value="{{ unos.prolaza if unos and unos.prolaza else '1' }}">
+        </div>
+      </div>
+      <div class="mb-2">
+        <label class="form-label small mb-1">Brzine (mm/min) — kolone</label>
+        <input class="form-control form-control-sm" name="brzine"
+               value="{{ unos.brzine if unos else '' }}" placeholder="250, 450, 600">
+      </div>
+      <div class="mb-2">
+        <label class="form-label small mb-1">Snage (%) — redovi</label>
+        <input class="form-control form-control-sm" name="snage"
+               value="{{ unos.snage if unos else '' }}" placeholder="40, 60, 80, 100">
+      </div>
+      <div class="row g-2 mb-2">
+        <div class="col-6">
+          <label class="form-label small mb-1">Strana kvadratića (mm)</label>
+          <input class="form-control form-control-sm" name="strana_mm"
+                 value="{{ unos.strana_mm if unos and unos.strana_mm else '10' }}">
+        </div>
+        <div class="col-6">
+          <label class="form-label small mb-1">Razmak (mm)</label>
+          <input class="form-control form-control-sm" name="razmak_mm"
+                 value="{{ unos.razmak_mm if unos and unos.razmak_mm else '3' }}">
+        </div>
+      </div>
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" name="gravura" value="1" id="gravura"
+               {% if gravura %}checked{% endif %}>
+        <label class="form-check-label small" for="gravura">
+          Puna ispuna (test graviranja). Bez kvačice se reže samo obris kvadratića.
+        </label>
+      </div>
+      <button class="btn btn-primary">Napravi mrežu</button>
+    </form>
+  </div>
+
+  <div class="col-lg-7">
+    {% if celije %}
+    <div class="card card-body mb-3">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <strong>{{ celije|length }} kvadratića</strong>
+        <a class="btn btn-sm btn-success ms-auto"
+           download="test_mreza.nc"
+           href="data:text/plain;base64,{{ nc_b64 }}">⬇ Preuzmi G-code (.nc)</a>
+      </div>
+      <img src="{{ pregled_uri }}" class="img-fluid border bg-white" alt="pregled mreže">
+    </div>
+
+    <div class="card card-body">
+      <div class="table-responsive" style="max-height:340px; overflow:auto">
+        <table class="table table-sm small mb-0">
+          <thead><tr><th>Ćelija</th><th>Brzina</th><th>Snaga</th><th>Prolaza</th><th>X</th><th>Y</th></tr></thead>
+          <tbody>
+            {% for c in celije %}
+            <tr>
+              <td><code>{{ c.oznaka }}</code></td>
+              <td>{{ c.brzina_mm_min }}</td>
+              <td>{{ c.snaga_pct }} %</td>
+              <td>{{ c.prolaza }}</td>
+              <td>{{ c.x_mm }}</td>
+              <td>{{ c.y_mm }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-secondary small mb-0 mt-2">
+        Poslije rezanja, za svaki kvadratić upiši ishod (<code>dobro</code>, <code>izgorjelo</code>,
+        <code>nije_presjeklo</code>, <code>neuredno</code>). Asistent neće davati preporuku dok ne
+        skupi dovoljno zapisa — do tada piše <strong>NEMAM POTVRDU</strong>.
+      </p>
+    </div>
+    {% else %}
+    <div class="card card-body text-secondary small">
+      Unesi brzine i snage pa klikni <strong>Napravi mrežu</strong>.
+      Mreža mora stati na radnu površinu — ako ne stane, dobićeš tačnu poruku koliko je prevelika.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

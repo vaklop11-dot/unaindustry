@@ -317,6 +317,49 @@ def create_app(data_dir: str | None = None, camera_source: str | None = None) ->
     def index(request: Request):
         return page(request, "index.html", {})
 
+    # ------------------------------------------------- test mreza materijala
+    def _tm_brojevi(tekst: str) -> list[float]:
+        return [x for x in (t.strip().replace(",", ".") for t in tekst.replace(";", ",").split(","))
+                if x]
+
+    @app.get("/test-mreza", response_class=HTMLResponse)
+    def test_mreza_form(request: Request):
+        return page(request, "test_mreza.html", {"materijali": list(C.LASER_MATERIALS_ALL)})
+
+    @app.post("/test-mreza", response_class=HTMLResponse)
+    async def test_mreza_napravi(request: Request):
+        """Mreza kvadratica: red = snaga, kolona = brzina. Kao Material Test u
+        LightBurn-u. Svaki kvadratic nosi svoje parametre, pa se na jednoj plocici
+        vidi gdje pocinje da gori a gdje jos ne sijece. Ishod svake celije se
+        poslije upisuje u ucenje.py i tako nastaje baza za model."""
+        from fabagent.laser import test_mreza as TM
+        form = await request.form()
+        ctx = {"materijali": list(C.LASER_MATERIALS_ALL),
+               "unos": {k: str(form.get(k) or "") for k in
+                        ("materijal", "debljina_mm", "brzine", "snage", "prolaza",
+                         "strana_mm", "razmak_mm", "gravura")}}
+        try:
+            cel = TM.celije(_tm_brojevi(str(form.get("brzine") or "")),
+                            _tm_brojevi(str(form.get("snage") or "")),
+                            prolaza=int(form.get("prolaza") or 1),
+                            strana_mm=float(form.get("strana_mm") or 10),
+                            razmak_mm=float(form.get("razmak_mm") or 3))
+            gravura = str(form.get("gravura") or "") in ("1", "on", "true")
+            mat = str(form.get("materijal") or "")
+            deb = float(form.get("debljina_mm") or 0) or None
+            nc = TM.gcode(cel, materijal=mat, debljina_mm=deb, puna_ispuna=gravura)
+            pregled = TM.svg(cel, mat)
+        except FabError as exc:
+            return page(request, "test_mreza.html", dict(ctx, banner=error_view(exc)[0]),
+                        HTTP_UNPROCESSABLE)
+        import base64 as _b64
+        ctx.update({"celije": TM.izvjestaj(cel), "nc": nc,
+                    "nc_b64": _b64.b64encode(nc.encode("utf-8")).decode("ascii"),
+                    "pregled_uri": "data:image/svg+xml;base64,"
+                                   + _b64.b64encode(pregled.encode("utf-8")).decode("ascii"),
+                    "gravura": gravura})
+        return page(request, "test_mreza.html", ctx)
+
     # ------------------------------------------------- ucenje iz ishoda
     @app.post("/job/ishod")
     async def job_ishod(request: Request):
