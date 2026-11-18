@@ -23,19 +23,22 @@ if str(KORIJEN) not in sys.path:
 
 from fabagent.core import config as C                      # noqa: E402
 from fabagent.core import gcode as G                       # noqa: E402
-from fabagent.core.converter import dxf_to_svg             # noqa: E402
+from fabagent.core.converter import SUPPORTED_EXT, convert  # noqa: E402
 from fabagent.core.svg_fixer import fix_svg                # noqa: E402
 from fabagent.laser import dijeljenje as DJ                 # noqa: E402
 from fabagent.laser import transformacije as TF            # noqa: E402
 from fabagent.laser.presets import get_preset               # noqa: E402
 
 
-def dxf_iz_zipa(zp: Path) -> list[tuple[str, bytes]]:
-    """Imena i sadrzaj svih .dxf unosa u arhivi. Arhiva se ne raspakuje na disk."""
+def crtezi_iz_zipa(zp: Path, ekstenzije: tuple[str, ...]) -> list[tuple[str, bytes]]:
+    """Imena i sadrzaj svih podrzanih unosa u arhivi. Arhiva se ne raspakuje."""
     out: list[tuple[str, bytes]] = []
     with zipfile.ZipFile(zp) as z:
         for ime in z.namelist():
-            if ime.lower().endswith(".dxf") and not ime.endswith("/"):
+            if ime.endswith("/"):
+                continue
+            ext = "." + ime.rsplit(".", 1)[-1].lower() if "." in ime else ""
+            if ext in ekstenzije:
                 out.append((ime.rsplit("/", 1)[-1], z.read(ime)))
     return out
 
@@ -58,11 +61,13 @@ def _postavke(materijal: str) -> dict:
     return izbor
 
 
-def obradi_dxf(ime: str, podaci: bytes, materijal: str, izlaz: Path, dijeli: bool,
-               operacije: list[str] | None = None) -> dict:
+def obradi_fajl(ime: str, podaci: bytes, materijal: str, izlaz: Path, dijeli: bool,
+                operacije: list[str] | None = None,
+                sirina_mm: float | None = None, prag: int | None = None) -> dict:
     red = {"fajl": ime, "status": "", "duple": 0, "poruka": ""}
     try:
-        konv = dxf_to_svg(podaci, "mm")
+        konv = convert(ime, podaci, dxf_units="mm",
+                       width_mm=sirina_mm, threshold=prag)
         popravljen = fix_svg(konv.svg, ime)
         post = _postavke(materijal)
         W, H = float(C.LASER_WORK_AREA_MM[0]), float(C.LASER_WORK_AREA_MM[1])
@@ -111,6 +116,11 @@ def main() -> int:
     a.add_argument("--materijal", default="sperploca_3mm", help="kljuc iz presets.py")
     a.add_argument("--izlaz", default="izlaz/dxf_paket", help="folder za .nc fajlove")
     a.add_argument("--samo", default="", help="obradi samo fajlove ciji naziv sadrzi ovaj tekst")
+    a.add_argument("--sirina-mm", type=float, default=None, dest="sirina_mm",
+                   help="sirina u mm za JPG/PNG/BMP (slike nemaju mjeru u sebi)")
+    a.add_argument("--prag", type=int, default=None, help="prag 0-255 za slike")
+    a.add_argument("--formati", default=",".join(SUPPORTED_EXT),
+                   help="koje ekstenzije uzeti iz arhive")
     a.add_argument("--okreni", default="", help="okreni_v | okreni_h | rot90 | rot180 | rot270, "
                                                "vise njih odvoji zarezom")
     a.add_argument("--bez-dijeljenja", action="store_true",
@@ -121,10 +131,13 @@ def main() -> int:
     if not p.exists():
         print(f"GRESKA: ne postoji: {p}")
         return 2
-    arhive = sorted(p.glob("*.zip")) if p.is_dir() else [p]
-    if not arhive:
-        print(f"GRESKA: nema nijedne .zip arhive u {p}")
-        return 2
+    if p.is_file() and p.suffix.lower() != ".zip":
+        arhive = []                       # pojedinacan crtez, bez arhive
+    else:
+        arhive = sorted(p.glob("*.zip")) if p.is_dir() else [p]
+        if not arhive:
+            print(f"GRESKA: nema nijedne .zip arhive u {p}")
+            return 2
 
     ops = [o.strip() for o in arg.okreni.split(",") if o.strip()]
     for o in ops:
@@ -132,22 +145,33 @@ def main() -> int:
             print(f"GRESKA: '{o}' nije operacija. Izbor: {', '.join(TF.OPERACIJE)}")
             return 2
 
+    ekstenzije = tuple(e if e.startswith(".") else "." + e
+                       for e in (x.strip().lower() for x in arg.formati.split(",")) if e)
+
     izlaz = Path(arg.izlaz)
     izlaz.mkdir(parents=True, exist_ok=True)
 
     ukupno = ok = pao = preskocen = duplih = 0
+    if not arhive:                        # jedan fajl, direktno
+        ukupno = 1
+        r = obradi_fajl(p.name, p.read_bytes(), arg.materijal, izlaz,
+                        not arg.bez_dijeljenja, ops, arg.sirina_mm, arg.prag)
+        print(f"   {r['status']:10} {p.name}  {r['poruka']}")
+        ok = 1 if r["status"] == "OK" else 0
+        pao = 1 - ok
     for zp in arhive:
         try:
-            unosi = dxf_iz_zipa(zp)
+            unosi = crtezi_iz_zipa(zp, ekstenzije)
         except zipfile.BadZipFile as exc:
             print(f"\n== {zp.name}\n   GRESKA: arhiva nije citljiva: {exc}")
             continue
         if arg.samo:
             unosi = [(i, d) for i, d in unosi if arg.samo.lower() in i.lower()]
-        print(f"\n== {zp.name}  ({len(unosi)} DXF)")
+        print(f"\n== {zp.name}  ({len(unosi)} crteza)")
         for ime, podaci in unosi:
             ukupno += 1
-            r = obradi_dxf(ime, podaci, arg.materijal, izlaz, not arg.bez_dijeljenja, ops)
+            r = obradi_fajl(ime, podaci, arg.materijal, izlaz, not arg.bez_dijeljenja, ops,
+                            arg.sirina_mm, arg.prag)
             duplih += r["duple"]
             if r["status"] == "OK":
                 ok += 1
@@ -160,7 +184,7 @@ def main() -> int:
                 pao += 1
                 print(f"   PAD        {ime}  {r['poruka']}")
 
-    print(f"\nDXF: {ukupno}   G-code napisan: {ok}   preskoceno: {preskocen}   palo: {pao}")
+    print(f"\nCrteza: {ukupno}   G-code napisan: {ok}   preskoceno: {preskocen}   palo: {pao}")
     print(f"Duplih putanja izbaceno ukupno: {duplih}")
     print(f"Fajlovi su u: {izlaz.resolve()}")
     print(f"Masina: {C.LASER_MACHINE_NAME}. Start pritiskas ti, ovaj program laser ne pokrece.")

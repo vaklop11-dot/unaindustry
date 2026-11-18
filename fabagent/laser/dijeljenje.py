@@ -101,12 +101,16 @@ def komadi(slojevi: dict[str, list], otvorene: dict[str, list] | None = None) ->
 
 
 def rasporedi(lista: list[Komad], sirina_mm: float, visina_mm: float,
-              razmak_mm: float = 2.0) -> tuple[list[list[tuple[Komad, float, float]]], list[Komad]]:
+              razmak_mm: float | None = None) -> tuple[list[list[tuple[Komad, float, float]]], list[Komad]]:
     """Slaze komade na table (police: red po red, visi prvi).
 
     Vraca (table, prevelici). Svaka tabla je lista (komad, pomak_x, pomak_y)
     gdje su pomaci koliko komad treba pomjeriti od svoje trenutne pozicije.
     """
+    # Graviranje trazi prelet van crteza (ENGRAVE_OVERSCAN_MM), pa rub table
+    # ne smije biti manji od njega - inace G-code trazi negativan X.
+    if razmak_mm is None:
+        razmak_mm = max(2.0, float(C.ENGRAVE_OVERSCAN_MM) + 0.5)
     prevelici = [k for k in lista
                  if k.sirina > sirina_mm + 1e-9 or k.visina > visina_mm + 1e-9]
     stanu = sorted((k for k in lista if k not in prevelici),
