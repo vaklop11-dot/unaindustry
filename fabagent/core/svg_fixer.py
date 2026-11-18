@@ -546,7 +546,10 @@ def fix_svg(data: bytes, filename: str = "upload.svg") -> FixResult:
             design.add(layer, layers[layer], layer.lower(), ot)
     if not rep.blocking:
         problems = check_design(design)
-        rep.blocking += problems
+        # Pravilo koje pociva na pretpostavljenom broju ne smije zaustaviti posao.
+        # Takva stavka dolazi oznacena sa "UPOZORENJE:" i ide u upozorenja.
+        rep.warnings += [p[len("UPOZORENJE: "):] for p in problems if p.startswith("UPOZORENJE: ")]
+        rep.blocking += [p for p in problems if not p.startswith("UPOZORENJE: ")]
     if rep.blocking:
         return FixResult(W, H, rep, layers, open_left, None, preview_svg(W, H, layers, open_left))
 
@@ -555,8 +558,15 @@ def fix_svg(data: bytes, filename: str = "upload.svg") -> FixResult:
     svg = design_to_svg(design, f"FabAgent upload: {filename}", "FabAgent - automatski popravljen SVG")
     report = validate_svg_text(svg)
     if not report["ok"]:
-        rep.blocking += report["errors"]
-        return FixResult(W, H, rep, layers, open_left, None, preview_svg(W, H, layers, open_left))
+        # I ovdje se upozorenja odvajaju od blokada: validator vrti ista pravila,
+        # pa bi pretpostavljeni min zid inace ponovo zaustavio posao.
+        greske = [e for e in report["errors"] if not e.startswith("UPOZORENJE: ")]
+        rep.warnings += [e[len("UPOZORENJE: "):] for e in report["errors"]
+                         if e.startswith("UPOZORENJE: ")]
+        if greske:
+            rep.blocking += greske
+            return FixResult(W, H, rep, layers, open_left, None,
+                             preview_svg(W, H, layers, open_left))
     return FixResult(W, H, rep, layers, open_left, design, svg)
 
 

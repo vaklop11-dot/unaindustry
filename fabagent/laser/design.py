@@ -102,14 +102,22 @@ def check_design(design: LaserDesign) -> list[str]:
             d = g2.polyline_min_distance(cut[i], cut[j])
             if d < C.LASER_MIN_WALL_MM - eps:
                 problems.append(
-                    f"CUT konture #{i} i #{j}: razmak {d:.3f} mm < min zid {C.LASER_MIN_WALL_MM} mm"
+                    ("" if getattr(C, "LASER_MIN_WALL_IZMJERENO", True) else "UPOZORENJE: ")
+                    + f"CUT konture #{i} i #{j}: razmak {d:.3f} mm < min zid "
+                      f"{C.LASER_MIN_WALL_MM} mm"
+                    + ("" if getattr(C, "LASER_MIN_WALL_IZMJERENO", True)
+                       else " (vrijednost NIJE izmjerena na tvom materijalu - provjeri na otpadu)")
                 )
     for i, (ring, depth) in enumerate(zip(cut, depths)):
         if depth % 2 == 1:   # rupa
             w = ring.max(axis=0) - ring.min(axis=0)
             if w.min() < C.LASER_MIN_HOLE_DIAMETER_MM - eps:
                 problems.append(
-                    f"CUT rupa #{i}: najmanja dimenzija {w.min():.3f} mm < min {C.LASER_MIN_HOLE_DIAMETER_MM} mm"
+                    ("" if getattr(C, "LASER_MIN_HOLE_IZMJERENO", True) else "UPOZORENJE: ")
+                    + f"CUT rupa #{i}: najmanja dimenzija {w.min():.3f} mm < min "
+                      f"{C.LASER_MIN_HOLE_DIAMETER_MM} mm"
+                    + ("" if getattr(C, "LASER_MIN_HOLE_IZMJERENO", True)
+                       else " (vrijednost NIJE izmjerena - provjeri na otpadu)")
                 )
 
     for layer in ("ENGRAVE", "SCORE"):

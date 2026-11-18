@@ -34,8 +34,14 @@ PRINTER_BUILD_VOLUME_MM = (220.0, 220.0, 250.0)  # PROVJERITI: radni volumen (X,
 # ---------------------------------------------------------------------------
 # Laser - geometrijska pravila
 # ---------------------------------------------------------------------------
-LASER_MIN_WALL_MM = 1.5             # min materijal izmedju dvije CUT konture
-LASER_MIN_HOLE_DIAMETER_MM = 2.0    # min promjer rupe koja se rezuje
+LASER_MIN_WALL_MM = 1.5             # NEMAM POTVRDU - nije mjereno na materijalu
+LASER_MIN_WALL_IZMJERENO = False    # dok je False, tanji zid je UPOZORENJE, ne blokada.
+                                    # Komercijalni paketi redovno imaju 1.1-1.5 mm i rezu
+                                    # se bez problema; blokirati posao zbog pretpostavljenog
+                                    # broja znaci zaustaviti rad bez dokaza. Kad se izmjeri,
+                                    # upisi stvarnu vrijednost i postavi ovo na True.
+LASER_MIN_HOLE_DIAMETER_MM = 2.0    # NEMAM POTVRDU - nije mjereno
+LASER_MIN_HOLE_IZMJERENO = False    # dok je False, manja rupa je UPOZORENJE, ne blokada
 CUT_ENGRAVE_CLEARANCE_MM = 0.5      # min razmak ENGRAVE/SCORE geometrije od CUT linije
 TEXT_EDGE_MARGIN_MM = 1.0           # min razmak teksta od ivice dijela (>= clearance)
 LASER_MIN_ENGRAVE_FEATURE_MM = 0.3  # min velicina "piksela" teksta / QR modula
